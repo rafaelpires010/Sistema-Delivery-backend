@@ -1,0 +1,125 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int            @id @default(autoincrement())
+  nome      String
+  email     String         @unique
+  senha     String
+  addresses User_Address[]
+  orders    Order[]
+}
+
+model User_Address {
+  id          Int     @id @default(autoincrement())
+  user        User    @relation(fields: [id_user], references: [id])
+  id_user     Int
+  rua         String
+  numero      String
+  cep         String
+  cidade      String
+  id_cidade   Int
+  estado      String
+  complemento String
+  Order       Order[]
+}
+
+model District {
+  id        Int    @id @default(autoincrement())
+  tenant    Tenant @relation(fields: [id_tenant], references: [id])
+  id_tenant Int
+  nome      String
+  preco     Float
+}
+
+model Order {
+  id               Int             @id @default(autoincrement())
+  user             User            @relation(fields: [id_user], references: [id])
+  id_user          Int
+  tenant           Tenant          @relation(fields: [id_tenant], references: [id])
+  id_tenant        Int
+  address          User_Address    @relation(fields: [id_address], references: [id])
+  id_address       Int
+  metodo_pagamento String
+  troco            Float
+  preco            Float
+  subtotal         Float
+  data_order       DateTime        @default(now())
+  status           String
+  products         Order_Product[]
+  statuses         Order_Status[]
+}
+
+model Order_Product {
+  id            Int     @id @default(autoincrement())
+  order         Order   @relation(fields: [id_order], references: [id])
+  id_order      Int
+  product       Product @relation(fields: [id_produto], references: [id])
+  id_produto    Int
+  preco_produto Float
+  quantidade    Int
+}
+
+model Order_Status {
+  id         Int      @id @default(autoincrement())
+  order      Order    @relation(fields: [id_order], references: [id])
+  id_order   Int
+  status     String
+  created_at DateTime
+}
+
+model Tenant {
+  id           Int        @id @default(autoincrement())
+  slug         String     @unique
+  status       String
+  nome         String
+  main_color   String
+  second_color String
+  email        String     @unique
+  senha        String
+  districts    District[]
+  products     Product[]
+  banners      Banner[]
+  Order        Order[]
+  Category     Category[]
+}
+
+model Product {
+  id          Int             @id @default(autoincrement())
+  tenant      Tenant          @relation(fields: [id_tenant], references: [id])
+  id_tenant   Int
+  category    Category        @relation(fields: [id_category], references: [id])
+  id_category Int
+  nome        String
+  img         String
+  preco       Float
+  descricao   String?
+  orders      Order_Product[]
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  tenant    Tenant    @relation(fields: [id_tenant], references: [id])
+  id_tenant Int
+  nome      String
+  products  Product[]
+}
+
+model Banner {
+  id        Int    @id @default(autoincrement())
+  tenant    Tenant @relation(fields: [id_tenant], references: [id])
+  id_tenant Int
+  img       String
+}
