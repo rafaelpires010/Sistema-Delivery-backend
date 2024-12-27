@@ -1,11 +1,15 @@
-import { Request, RequestHandler, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { z } from 'zod';
+import { Request, RequestHandler, Response } from "express";
+import { PrismaClient } from "@prisma/client";
+import upload from "../middlewares/upload"; // the middleware configured with multer-s3 for S3 uploads
+import { any, z } from "zod";
 
 const prisma = new PrismaClient();
 
 // Obter Produtos por Tenant
-export const getProductsByTenant: RequestHandler = async (req: Request, res: Response) => {
+export const getProductsByTenant: RequestHandler = async (
+  req: Request,
+  res: Response
+) => {
   try {
     const tenantSlug = req.params.tenantSlug;
 
@@ -24,29 +28,32 @@ export const getProductsByTenant: RequestHandler = async (req: Request, res: Res
     if (tenant) {
       res.json(tenant.products);
     } else {
-      res.status(404).send('Tenant não encontrado');
+      res.status(404).send("Tenant não encontrado");
     }
   } catch (error) {
-    console.error('Erro ao obter produtos:', error);
-    res.status(500).send('Erro ao obter produtos');
+    console.error("Erro ao obter produtos:", error);
+    res.status(500).send("Erro ao obter produtos");
   } finally {
     await prisma.$disconnect();
   }
 };
 
 // Obter Produto por ID
-export const getProductById: RequestHandler = async (req: Request, res: Response) => {
+export const getProductById: RequestHandler = async (
+  req: Request,
+  res: Response
+) => {
   try {
     const { tenantSlug, productId } = req.params;
 
     if (!tenantSlug || !productId) {
-      return res.status(400).json({ message: 'Parâmetros inválidos' });
+      return res.status(400).json({ message: "Parâmetros inválidos" });
     }
 
     const id = parseInt(productId, 10);
 
     if (isNaN(id)) {
-      return res.status(400).json({ message: 'ID do produto inválido' });
+      return res.status(400).json({ message: "ID do produto inválido" });
     }
 
     // Buscar o produto pelo ID e verificar se pertence ao tenant correto
@@ -65,11 +72,13 @@ export const getProductById: RequestHandler = async (req: Request, res: Response
     if (product) {
       res.json(product);
     } else {
-      res.status(404).json({ message: 'Produto não encontrado ou não acessível' });
+      res
+        .status(404)
+        .json({ message: "Produto não encontrado ou não acessível" });
     }
   } catch (error) {
-    console.error('Erro ao buscar produto:', error);
-    res.status(500).json({ message: 'Erro interno do servidor' });
+    console.error("Erro ao buscar produto:", error);
+    res.status(500).json({ message: "Erro interno do servidor" });
   } finally {
     await prisma.$disconnect();
   }
@@ -77,67 +86,81 @@ export const getProductById: RequestHandler = async (req: Request, res: Response
 
 //criar produto
 
+// Validation schema
 const createProductSchema = z.object({
-  nome: z.string().min(1, 'Nome é obrigatório'),
-  img: z.string().url('Imagem deve ser uma URL válida'),
-  id_category: z.number().int().positive('ID da categoria deve ser um número positivo'),
-  preco: z.number().positive('Preço deve ser um valor positivo'),
+  nome: z.string().min(1, "Nome é obrigatório"),
+  img: z.string().url("Imagem deve ser uma URL válida"),
+  id_category: z
+    .number()
+    .int()
+    .positive("ID da categoria deve ser um número positivo"),
+  preco: z.number().positive("Preço deve ser um valor positivo"),
   descricao: z.string().optional(),
-  id_tenant: z.number().int().positive('ID do tenant é obrigatório'),
+  id_tenant: z.number().int().positive("ID do tenant é obrigatório"),
 });
 
-export const createProduct: RequestHandler = async (req: Request, res: Response) => {
+// Controller to create a product
+export const createProduct: RequestHandler = async (
+  req: Request,
+  res: Response
+) => {
   const { nome, id_category, preco, descricao } = req.body;
-  const img = req.file?.path; // Caminho do arquivo enviado
+  const img = (req.file as any)?.location; // Using the S3 URL provided by multer-s3
 
-  // ID do tenant é passado como parâmetro da URL
+  // Tenant slug is passed as a URL parameter
   const tenantSlug = req.params.tenantSlug;
 
   if (!nome || !img || !id_category || !preco || !tenantSlug) {
-    return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos.' });
+    return res
+      .status(400)
+      .json({ error: "Todos os campos obrigatórios devem ser preenchidos." });
   }
 
   const idCategory = parseInt(id_category as string, 10);
-  const price = parseFloat(preco.replace(',', '.') as string);
+  const price = parseFloat(preco.replace(",", ".") as string);
 
   try {
-    // Buscar o tenant pelo slug
+    // Find the tenant by slug
     const tenant = await prisma.tenant.findUnique({
       where: { slug: tenantSlug },
     });
 
     if (!tenant) {
-      return res.status(404).json({ error: 'Tenant não encontrado.' });
+      return res.status(404).json({ error: "Tenant não encontrado." });
     }
 
-    // Verificar se a categoria pertence ao mesmo tenant
+    // Check if the category belongs to the same tenant
     const category = await prisma.category.findFirst({
       where: {
         id: idCategory,
-        id_tenant: tenant.id, // Assumindo que `tenantId` é o campo que liga a categoria ao tenant
+        id_tenant: tenant.id, // Assuming `id_tenant` is the field linking category to tenant
       },
     });
 
     if (!category) {
-      return res.status(404).json({ error: 'Categoria não encontrada ou não pertence ao tenant.' });
+      return res
+        .status(404)
+        .json({ error: "Categoria não encontrada ou não pertence ao tenant." });
     }
 
     const data = {
       nome,
-      img,
+      img, // S3 URL from multer-s3
       id_category: idCategory,
       preco: price,
-      descricao: descricao ?? '',
-      id_tenant: tenant.id, // Usa o ID do tenant encontrado na URL
+      descricao: descricao ?? "",
+      id_tenant: tenant.id, // Use the tenant ID from the URL slug
     };
 
-    // Validar os dados com o schema
+    // Validate data with schema
     const body = createProductSchema.safeParse(data);
     if (!body.success) {
-      return res.status(400).json({ error: 'Dados inválidos', details: body.error.issues });
+      return res
+        .status(400)
+        .json({ error: "Dados inválidos", details: body.error.issues });
     }
 
-    // Criar o produto
+    // Create the product
     const newProduct = await prisma.product.create({
       data: {
         nome: body.data.nome,
@@ -151,23 +174,26 @@ export const createProduct: RequestHandler = async (req: Request, res: Response)
 
     res.status(201).json(newProduct);
   } catch (error) {
-    console.error('Erro ao criar produto:', error);
-    res.status(500).json({ error: 'Erro ao criar produto', details: error });
+    console.error("Erro ao criar produto:", error);
+    res.status(500).json({ error: "Erro ao criar produto", details: error });
   } finally {
     await prisma.$disconnect();
   }
 
-  console.log('Dados recebidos:', req.body);
-  console.log('Arquivo recebido:', req.file);
+  console.log("Dados recebidos:", req.body);
+  console.log("Arquivo recebido:", req.file);
 };
 
 //deletar produto
-export const deleteProduct: RequestHandler = async (req: Request, res: Response) => {
+export const deleteProduct: RequestHandler = async (
+  req: Request,
+  res: Response
+) => {
   const productId = parseInt(req.params.productId, 10);
   const tenantSlug = req.params.tenantSlug;
 
   if (isNaN(productId)) {
-    return res.status(400).json({ error: 'ID do produto inválido.' });
+    return res.status(400).json({ error: "ID do produto inválido." });
   }
 
   try {
@@ -177,7 +203,7 @@ export const deleteProduct: RequestHandler = async (req: Request, res: Response)
     });
 
     if (!tenant) {
-      return res.status(404).json({ error: 'Tenant não encontrado.' });
+      return res.status(404).json({ error: "Tenant não encontrado." });
     }
 
     // Verificar se o produto pertence ao tenant
@@ -189,7 +215,9 @@ export const deleteProduct: RequestHandler = async (req: Request, res: Response)
     });
 
     if (!product) {
-      return res.status(404).json({ error: 'Produto não encontrado ou não pertence ao tenant.' });
+      return res
+        .status(404)
+        .json({ error: "Produto não encontrado ou não pertence ao tenant." });
     }
 
     // Deletar o produto
@@ -197,32 +225,42 @@ export const deleteProduct: RequestHandler = async (req: Request, res: Response)
       where: { id: productId },
     });
 
-    res.status(200).json({ message: 'Produto deletado com sucesso.' });
+    res.status(200).json({ message: "Produto deletado com sucesso." });
   } catch (error) {
-    console.error('Erro ao deletar produto:', error);
-    res.status(500).json({ error: 'Erro ao deletar produto', details: error });
+    console.error("Erro ao deletar produto:", error);
+    res.status(500).json({ error: "Erro ao deletar produto", details: error });
   } finally {
     await prisma.$disconnect();
   }
 };
 
 //editar produto
+
+// Schema de validação de atualização do produto
 const updateProductSchema = z.object({
-  nome: z.string().min(1, 'Nome é obrigatório').optional(),
-  img: z.string().url('Imagem deve ser uma URL válida').optional(),
-  id_category: z.number().int().positive('ID da categoria deve ser um número positivo').optional(),
-  preco: z.number().positive('Preço deve ser um valor positivo').optional(),
+  nome: z.string().min(1, "Nome é obrigatório").optional(),
+  img: z.string().url("Imagem deve ser uma URL válida").optional(),
+  id_category: z
+    .number()
+    .int()
+    .positive("ID da categoria deve ser um número positivo")
+    .optional(),
+  preco: z.number().positive("Preço deve ser um valor positivo").optional(),
   descricao: z.string().optional(),
 });
 
-export const updateProduct: RequestHandler = async (req: Request, res: Response) => {
+export const updateProduct: RequestHandler = async (
+  req: Request,
+  res: Response
+) => {
   const { nome, id_category, preco, descricao } = req.body;
-  const img = req.file?.path; // Caminho do arquivo enviado
+  const img = (req.file as any)?.location; // Caminho da imagem no S3
   const productId = parseInt(req.params.productId, 10);
   const tenantSlug = req.params.tenantSlug;
 
+  // Verificar se o ID do produto é válido
   if (isNaN(productId)) {
-    return res.status(400).json({ error: 'ID do produto inválido.' });
+    return res.status(400).json({ error: "ID do produto inválido." });
   }
 
   try {
@@ -232,7 +270,7 @@ export const updateProduct: RequestHandler = async (req: Request, res: Response)
     });
 
     if (!tenant) {
-      return res.status(404).json({ error: 'Tenant não encontrado.' });
+      return res.status(404).json({ error: "Tenant não encontrado." });
     }
 
     // Verificar se o produto pertence ao tenant
@@ -244,34 +282,42 @@ export const updateProduct: RequestHandler = async (req: Request, res: Response)
     });
 
     if (!product) {
-      return res.status(404).json({ error: 'Produto não encontrado ou não pertence ao tenant.' });
+      return res
+        .status(404)
+        .json({ error: "Produto não encontrado ou não pertence ao tenant." });
     }
 
-    // Converter os valores para o tipo correto antes de validar
+    // Prepara os dados para atualização
     const data: any = {
       nome: nome ?? product.nome,
-      img: img ? img : product.img, // Usa o novo arquivo se fornecido, senão mantém o atual
-      id_category: id_category ? parseInt(id_category as string, 10) : product.id_category,
-      preco: preco ? parseFloat(preco.replace(',', '.') as string) : product.preco,
+      img: img ? img : product.img, // Usa a imagem fornecida ou mantém a atual
+      id_category: id_category
+        ? parseInt(id_category as string, 10)
+        : product.id_category,
+      preco: preco ? parseFloat(preco.replace(",", ".")) : product.preco, // Garantir que preço seja convertido corretamente
       descricao: descricao ?? product.descricao,
     };
 
     // Validar os dados com o schema
     const body = updateProductSchema.safeParse(data);
     if (!body.success) {
-      return res.status(400).json({ error: 'Dados inválidos', details: body.error.issues });
+      return res
+        .status(400)
+        .json({ error: "Dados inválidos", details: body.error.issues });
     }
 
-    // Atualizar o produto
+    // Atualizar o produto no banco de dados
     const updatedProduct = await prisma.product.update({
       where: { id: productId },
-      data: body.data,
+      data: body.data, // Dados validados
     });
 
     res.status(200).json(updatedProduct);
   } catch (error) {
-    console.error('Erro ao atualizar produto:', error);
-    res.status(500).json({ error: 'Erro ao atualizar produto', details: error });
+    console.error("Erro ao atualizar produto:", error);
+    res
+      .status(500)
+      .json({ error: "Erro ao atualizar produto", details: error });
   } finally {
     await prisma.$disconnect();
   }

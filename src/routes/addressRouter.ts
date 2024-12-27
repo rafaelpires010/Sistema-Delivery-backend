@@ -1,17 +1,22 @@
-import { Router } from 'express';
-import { getAddressByUser } from '../controllers/addressController';
-
+import { Router } from "express";
+import {
+  createAddress,
+  deleteAddress,
+  editAddress,
+  getAddressById,
+  getAddressByUser,
+} from "../controllers/addressController";
 
 const router = Router();
 
-router.get('/:tenantSlug/address', getAddressByUser);
+router.get("/:tenantSlug/addresses", getAddressByUser);
 
-router.get('/:tenantSlug/categories/:categoryId',);
+router.get("/:tenantSlug/address/:id", getAddressById);
 
-router.post('/:tenantSlug/categories',);
+router.post("/:tenantSlug/newaddress", createAddress);
 
-router.put('/:tenantSlug/categories/:categoryId', );
+router.put("/:tenantSlug/address/:id", editAddress);
 
-router.delete('/:tenantSlug/categories/:categoryId',);
+router.delete("/:tenantSlug/address/:id", deleteAddress);
 
 export default router;

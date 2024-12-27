@@ -14,12 +14,16 @@ datasource db {
 }
 
 model User {
-  id        Int            @id @default(autoincrement())
-  nome      String
-  email     String         @unique
-  senha     String
-  addresses User_Address[]
-  orders    Order[]
+  id          Int            @id @default(autoincrement())
+  nome        String
+  telefone    String
+  email       String         @unique
+  senha       String
+  resetToken  String? // Token para recuperação de senha
+  tokenExpiry DateTime? // Data de expiração do token
+  addresses   User_Address[]
+  orders      Order[]
+  tenants     UserTenant[] // Relação muitos-para-muitos com Tenant
 }
 
 model User_Address {
@@ -30,9 +34,10 @@ model User_Address {
   numero      String
   cep         String
   cidade      String
+  bairro      String
   id_cidade   Int
   estado      String
-  complemento String
+  complemento String?
   Order       Order[]
 }
 
@@ -54,6 +59,7 @@ model Order {
   id_address       Int
   metodo_pagamento String
   troco            Float
+  shippingPrice    Float
   preco            Float
   subtotal         Float
   data_order       DateTime        @default(now())
@@ -68,6 +74,7 @@ model Order_Product {
   id_order      Int
   product       Product @relation(fields: [id_produto], references: [id])
   id_produto    Int
+  nome_produto  String
   preco_produto Float
   quantidade    Int
 }
@@ -81,19 +88,105 @@ model Order_Status {
 }
 
 model Tenant {
-  id           Int        @id @default(autoincrement())
-  slug         String     @unique
+  id           Int     @id @default(autoincrement())
+  slug         String  @unique
   status       String
+  OnClose      Boolean
   nome         String
   main_color   String
   second_color String
-  email        String     @unique
+  email        String  @unique
   senha        String
-  districts    District[]
-  products     Product[]
-  banners      Banner[]
-  Order        Order[]
-  Category     Category[]
+  img          String?
+
+  tenantInfo          TenantInfo?          @relation("TenantInfoRelation")
+  tenantFuncionamento TenantFuncionamento? @relation("TenantFuncionamentoRelation")
+  tipoRece            TenantTipoRece[]
+
+  districts District[]
+  products  Product[]
+  banners   Banner[]
+  Order     Order[]
+  Category  Category[]
+  users     UserTenant[]
+  zone      Zone?        @relation("TenantZoneRelation")
+  cupons    Cupons[] // Relacionamento 1-para-muitos com Cupons
+}
+
+model TenantInfo {
+  id            Int     @id @default(autoincrement())
+  cnpj          String
+  telefone      String?
+  whatsapp      String?
+  cep           String
+  rua           String
+  numero        String
+  cidade        String
+  estado        String
+  latitude      Float
+  longitude     Float
+  instagram     String?
+  tempoMaxEntre String?
+
+  tenantId Int    @unique
+  tenant   Tenant @relation("TenantInfoRelation", fields: [tenantId], references: [id])
+}
+
+model Zone {
+  id              Int   @id @default(autoincrement())
+  tenantId        Int   @unique // Cada zona é associada a um único tenant, e vice-versa
+  maxDistanceKm   Float // Distância máxima para a zona
+  fixedFee        Float // Taxa fixa de frete para a zona
+  fixedDistanceKm Float // Distância que a taxa fixa cobre sem adicional
+  additionalKmFee Float // Taxa adicional por quilômetro acima da distância fixa
+
+  tenant Tenant @relation("TenantZoneRelation", fields: [tenantId], references: [id])
+}
+
+model Cupons {
+  id           Int       @id @default(autoincrement())
+  nome         String
+  codigo       String    @unique
+  desconto     Float
+  tipoDesconto String // Valores: "percentual" ou "valor"
+  validade     DateTime?
+  dataInicio   DateTime?
+  limiteUso    Int?
+  usosAtuais   Int       @default(0)
+  valorMinimo  Float?
+  descricao    String?
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+}
+
+model TenantFuncionamento {
+  id        Int    @id @default(autoincrement())
+  segOpen   String
+  segClose  String
+  terOpen   String
+  terClose  String
+  quarOpen  String
+  quarClose String
+  quinOpen  String
+  quinClose String
+  sexOpen   String
+  sexClose  String
+  sabOpen   String
+  sabClose  String
+  domOpen   String
+  domClose  String
+
+  tenantId Int    @unique
+  tenant   Tenant @relation("TenantFuncionamentoRelation", fields: [tenantId], references: [id]) // Relacionamento 1-para-1 com Tenant
+}
+
+model TenantTipoRece {
+  id       Int    @id @default(autoincrement())
+  tipoRece String
+
+  tenantId Int
+  tenant   Tenant @relation(fields: [tenantId], references: [id]) // Relacionamento muitos-para-1 com Tenant
 }
 
 model Product {
@@ -114,6 +207,7 @@ model Category {
   tenant    Tenant    @relation(fields: [id_tenant], references: [id])
   id_tenant Int
   nome      String
+  img       String?
   products  Product[]
 }
 
@@ -122,4 +216,15 @@ model Banner {
   tenant    Tenant @relation(fields: [id_tenant], references: [id])
   id_tenant Int
   img       String
+}
+
+model UserTenant {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  tenantId Int
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role     String // Define o papel do usuário para o tenant (exemplo: "cliente", "admin", etc.)
+
+  @@unique([userId, tenantId]) // Garante uma relação única para cada par userId-tenantId
 }
