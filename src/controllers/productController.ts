@@ -1,7 +1,6 @@
 import { Request, RequestHandler, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import upload from "../middlewares/upload"; // the middleware configured with multer-s3 for S3 uploads
-import { any, z } from "zod";
+import { createProductSchema, updateProductSchema } from "../schema/product";
 
 const prisma = new PrismaClient();
 
@@ -85,21 +84,6 @@ export const getProductById: RequestHandler = async (
 };
 
 //criar produto
-
-// Validation schema
-const createProductSchema = z.object({
-  nome: z.string().min(1, "Nome é obrigatório"),
-  img: z.string().url("Imagem deve ser uma URL válida"),
-  id_category: z
-    .number()
-    .int()
-    .positive("ID da categoria deve ser um número positivo"),
-  preco: z.number().positive("Preço deve ser um valor positivo"),
-  descricao: z.string().optional(),
-  id_tenant: z.number().int().positive("ID do tenant é obrigatório"),
-});
-
-// Controller to create a product
 export const createProduct: RequestHandler = async (
   req: Request,
   res: Response
@@ -235,20 +219,6 @@ export const deleteProduct: RequestHandler = async (
 };
 
 //editar produto
-
-// Schema de validação de atualização do produto
-const updateProductSchema = z.object({
-  nome: z.string().min(1, "Nome é obrigatório").optional(),
-  img: z.string().url("Imagem deve ser uma URL válida").optional(),
-  id_category: z
-    .number()
-    .int()
-    .positive("ID da categoria deve ser um número positivo")
-    .optional(),
-  preco: z.number().positive("Preço deve ser um valor positivo").optional(),
-  descricao: z.string().optional(),
-});
-
 export const updateProduct: RequestHandler = async (
   req: Request,
   res: Response

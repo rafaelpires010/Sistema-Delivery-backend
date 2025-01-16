@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { ExtendedRequest } from "../types/extended-request";
-import argon2 from "argon2";
 import jwt from "jsonwebtoken";
 
 const prisma = new PrismaClient();
@@ -18,6 +17,7 @@ export const getTenantBySlug = async (req: ExtendedRequest, res: Response) => {
         tipoRece: true, // Inclui os dados da tabela TenantTipoRece
         tenantFuncionamento: true, // Inclui os dados da tabela TenantFuncionamento
         zone: true,
+        banners: true,
       },
     });
 

@@ -29,6 +29,10 @@ import {
   updateOrderStatus,
 } from "../../controllers/orderController";
 import { authorizeRole } from "../../middlewares/hasRole";
+import {
+  addBanner,
+  getBannersByTenant,
+} from "../../controllers/bannerController";
 
 const router = Router();
 
@@ -114,5 +118,10 @@ router.put(
   updateProduct,
   verifyJWT
 );
+
+//Rotas Banner
+router.post("/:tenantSlug/banners", upload.single("img"), addBanner, verifyJWT);
+
+router.get("/:tenantSlug/banners", getBannersByTenant, verifyJWT);
 
 export default router;
