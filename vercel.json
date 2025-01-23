@@ -11,6 +11,9 @@
         "src": "/(.*)",
         "dest": "src/server.js"
       }
-    ]
+    ],
+    "scripts": {
+        "build": "npm run build && npx prisma migrate deploy"
+      }
   }
   
