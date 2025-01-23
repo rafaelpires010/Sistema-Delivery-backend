@@ -21,8 +21,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// app.all("*", requestinterceptor);
-
 // Defina suas rotas
 app.use("/admin", adminRoutes);
 app.use(
