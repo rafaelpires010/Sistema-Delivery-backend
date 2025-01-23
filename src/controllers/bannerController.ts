@@ -86,3 +86,52 @@ export const getBannersByTenant: RequestHandler = async (
     await prisma.$disconnect();
   }
 };
+
+export const deleteBannerByID: RequestHandler = async (
+  req: Request,
+  res: Response
+) => {
+  const bannerId = parseInt(req.params.bannerId, 10);
+  const tenantSlug = req.params.tenantSlug;
+
+  if (isNaN(bannerId)) {
+    return res.status(400).json({ error: "ID do Banner inválido." });
+  }
+
+  try {
+    // Buscar o tenant pelo slug
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant não encontrado." });
+    }
+
+    // Verificar se o banner pertence ao tenant
+    const banner = await prisma.banner.findFirst({
+      where: {
+        id: bannerId,
+        id_tenant: tenant.id,
+      },
+    });
+
+    if (!banner) {
+      return res
+        .status(404)
+        .json({ error: "Banner não encontrado ou não pertence ao tenant." });
+    }
+
+    // Deletar o produto
+    await prisma.banner.delete({
+      where: { id: bannerId },
+    });
+
+    res.status(200).json({ message: "Banner deletado com sucesso." });
+  } catch (error) {
+    console.error("Erro ao deletar produto:", error);
+    res.status(500).json({ error: "Erro ao deletar produto", details: error });
+  } finally {
+    await prisma.$disconnect();
+  }
+};

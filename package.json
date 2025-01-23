@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon",
-    "build": "tsc",
-    "start": "node build/server.js"
-  },
+  "dev": "nodemon src/server.ts",
+  "build": "tsc",
+  "start": "node build/server.js"
+},
   "author": "",
   "license": "ISC",
   "devDependencies": {

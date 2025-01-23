@@ -5,6 +5,11 @@ import {
   getTenantBySlug,
   getTenantOpenClose,
   setTenantOpenClose,
+  updateTenantEnder,
+  updateTenantFunc,
+  updateTenantInfos,
+  updateTenantLayout,
+  updateTenantZone,
 } from "../../controllers/tenantController";
 import {
   createProduct,
@@ -31,8 +36,10 @@ import {
 import { authorizeRole } from "../../middlewares/hasRole";
 import {
   addBanner,
+  deleteBannerByID,
   getBannersByTenant,
 } from "../../controllers/bannerController";
+import { getCuponsByTenant } from "../../controllers/CuponsController";
 
 const router = Router();
 
@@ -55,6 +62,26 @@ router.get("/:tenantSlug/products/:productId", verifyJWT, getProductById);
 router.get("/:tenantSlug/toggleOpenClose", verifyJWT, getTenantOpenClose);
 
 router.post("/:tenantSlug/toggleOpenClose", verifyJWT, setTenantOpenClose);
+
+//edição do layout
+router.put(
+  "/:tenantSlug/layout/:tenantId",
+  upload.single("img"),
+  updateTenantLayout,
+  verifyJWT
+);
+
+//edição das Informações
+router.put("/:tenantSlug/infos/:tenantId", updateTenantInfos, verifyJWT);
+
+//edição das Zonas de entrega
+router.put("/:tenantSlug/zones/:tenantId", updateTenantZone, verifyJWT);
+
+//edição dos horarios de funcionamento
+router.put("/:tenantSlug/funcionamento/:tenantId", updateTenantFunc, verifyJWT);
+
+//edição do endereço
+router.put("/:tenantSlug/endereco/:tenantId", updateTenantEnder, verifyJWT);
 
 //Rotas Categorias
 
@@ -123,5 +150,10 @@ router.put(
 router.post("/:tenantSlug/banners", upload.single("img"), addBanner, verifyJWT);
 
 router.get("/:tenantSlug/banners", getBannersByTenant, verifyJWT);
+
+router.delete("/:tenantSlug/banner/:bannerId", verifyJWT, deleteBannerByID);
+
+//Rotas Cupom
+router.get("/:tenantSlug/cupons", verifyJWT, getCuponsByTenant);
 
 export default router;

@@ -2,6 +2,11 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { ExtendedRequest } from "../types/extended-request";
 import jwt from "jsonwebtoken";
+import { updateTenantSchema } from "../schema/Tenant";
+import { updateTenantInfosSchema } from "../schema/TenantInfo";
+import { updateTenantZoneSchema } from "../schema/zone";
+import { updateTenantFuncSchema } from "../schema/TenantFunc";
+import { updateTenantEndecSchema } from "../schema/TenantEndec";
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.DEFAULT_TOKEN || "default_secret";
@@ -131,7 +136,7 @@ export const getAllTenantByUser = async (req: Request, res: Response) => {
     // Mapeia os tenants para enviar apenas os dados necessários na resposta
     const tenantData = tenants.map((userTenant) => ({
       id: userTenant.tenant.id,
-      name: userTenant.tenant.nome,
+      nome: userTenant.tenant.nome,
       slug: userTenant.tenant.slug,
       OnClose: userTenant.tenant.OnClose,
       img: userTenant.tenant.img,
@@ -149,5 +154,344 @@ export const getAllTenantByUser = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Erro ao buscar tenants", details: error });
   } finally {
     await prisma.$disconnect();
+  }
+};
+
+export const updateTenantLayout = async (req: Request, res: Response) => {
+  const tenantId = parseInt(req.params.tenantId, 10);
+
+  // Verificar se o ID do tenant é válido
+  if (isNaN(tenantId)) {
+    return res.status(400).json({ error: "ID do Tenant inválido." });
+  }
+
+  // Extrair os campos textuais do corpo da requisição
+  const { nome, main_color, second_color } = req.body;
+
+  // Extrair o arquivo da imagem do upload (via Multer)
+  const img = (req.file as any)?.location || (req.file as any)?.path; // Ajuste dependendo do local de armazenamento
+
+  // Validar se ao menos um campo foi fornecido
+  if (!nome && !main_color && !second_color && !img) {
+    return res.status(400).json({
+      error:
+        "É necessário fornecer ao menos um campo para atualização (nome, cor principal, cor secundária, imagem).",
+    });
+  }
+
+  try {
+    // Buscar o tenant pelo ID
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant não encontrado." });
+    }
+
+    // Preparar os dados para atualização
+    const data = {
+      nome: nome ?? tenant.nome,
+      main_color: main_color ?? tenant.main_color,
+      second_color: second_color ?? tenant.second_color,
+      img: img ?? tenant.img, // Usa a nova imagem, se fornecida
+    };
+
+    // Validar os dados com o schema
+    const validationResult = updateTenantSchema.safeParse(data);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Dados inválidos",
+        details: validationResult.error.issues,
+      });
+    }
+
+    // Atualizar os dados do tenant
+    const updatedTenant = await prisma.tenant.update({
+      where: { id: tenantId },
+      data: validationResult.data, // Dados validados
+    });
+
+    // Retornar a resposta com a confirmação da atualização
+    res.status(200).json({
+      message: "Layout do tenant atualizado com sucesso.",
+      tenant: updatedTenant,
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar layout do tenant:", error);
+    res.status(500).json({ error: "Erro ao atualizar layout do tenant." });
+  }
+};
+
+export const updateTenantInfos = async (req: Request, res: Response) => {
+  const tenantId = parseInt(req.params.tenantId, 10);
+
+  if (isNaN(tenantId)) {
+    return res.status(400).json({ error: "ID do Tenant inválido." });
+  }
+  const { cnpj, telefone, whatsapp, instagram } = req.body;
+
+  console.log(cnpj, telefone, whatsapp, instagram);
+
+  if (!cnpj && !telefone && !whatsapp && !instagram) {
+    return res.status(400).json({
+      error: "É necessário fornecer ao menos um campo para atualização.",
+    });
+  }
+
+  try {
+    const tenantInfo = await prisma.tenantInfo.findUnique({
+      where: { tenantId: tenantId },
+    });
+
+    if (!tenantInfo) {
+      return res.status(404).json({ error: "Tenant não encontrado." });
+    }
+
+    const data = {
+      cnpj: cnpj ?? tenantInfo.cnpj,
+      telefone: telefone ?? tenantInfo.telefone,
+      whatsapp: whatsapp ?? tenantInfo.whatsapp,
+      instagram: instagram ?? tenantInfo.instagram,
+    };
+
+    const validationResult = updateTenantInfosSchema.safeParse(data);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Dados inválidos",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const updatedTenant = await prisma.tenantInfo.update({
+      where: { tenantId: tenantId },
+      data: validationResult.data,
+    });
+
+    res.status(200).json({
+      message: "Informações do tenant atualizadas com sucesso.",
+      tenant: updatedTenant,
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar informações do tenant:", error);
+    res.status(500).json({ error: "Erro ao atualizar informações do tenant." });
+  }
+};
+
+export const updateTenantFunc = async (req: Request, res: Response) => {
+  const tenantId = parseInt(req.params.tenantId, 10);
+
+  if (isNaN(tenantId)) {
+    return res.status(400).json({ error: "ID do Tenant inválido." });
+  }
+
+  const {
+    segOpen,
+    segClose,
+    terOpen,
+    terClose,
+    quarOpen,
+    quarClose,
+    quinOpen,
+    quinClose,
+    sexOpen,
+    sexClose,
+    sabOpen,
+    sabClose,
+    domOpen,
+    domClose,
+  } = req.body;
+
+  if (
+    !segOpen &&
+    !segClose &&
+    !terOpen &&
+    !terClose &&
+    !quarOpen &&
+    !quarClose &&
+    !quinOpen &&
+    !quinClose &&
+    !sexOpen &&
+    !sexClose &&
+    !sabOpen &&
+    !sabClose &&
+    !domOpen &&
+    !domClose
+  ) {
+    return res.status(400).json({
+      error: "É necessário fornecer ao menos um campo para atualização.",
+    });
+  }
+
+  try {
+    const tenantFunc = await prisma.tenantFuncionamento.findUnique({
+      where: { tenantId: tenantId },
+    });
+
+    if (!tenantFunc) {
+      return res.status(404).json({ error: "Tenant não encontrado." });
+    }
+
+    const data = {
+      segOpen: segOpen ?? tenantFunc.segOpen,
+      segClose: segClose ?? tenantFunc.segClose,
+      terOpen: terOpen ?? tenantFunc.terOpen,
+      terClose: terClose ?? tenantFunc.terClose,
+      quaOpen: quarOpen ?? tenantFunc.quarOpen,
+      quaClose: quarClose ?? tenantFunc.quarClose,
+      quiOpen: quinOpen ?? tenantFunc.quinOpen,
+      quiClose: quinClose ?? tenantFunc.quinClose,
+      sexOpen: sexOpen ?? tenantFunc.sexOpen,
+      sexClose: sexClose ?? tenantFunc.sexClose,
+      sabOpen: sabOpen ?? tenantFunc.sabOpen,
+      sabClose: sabClose ?? tenantFunc.sabClose,
+      domOpen: domOpen ?? tenantFunc.domOpen,
+      domClose: domClose ?? tenantFunc.domClose,
+    };
+
+    const validationResult = updateTenantFuncSchema.safeParse(data);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Dados inválidos",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const updatedTenant = await prisma.tenantFuncionamento.update({
+      where: { tenantId: tenantId },
+      data: validationResult.data,
+    });
+
+    res.status(200).json({
+      message:
+        "Informações de Horarios de Funcionamento atualizadas com sucesso.",
+      tenant: updatedTenant,
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar informações do tenant:", error);
+    res.status(500).json({ error: "Erro ao atualizar informações do tenant." });
+  }
+};
+
+export const updateTenantZone = async (req: Request, res: Response) => {
+  const tenantId = parseInt(req.params.tenantId, 10);
+
+  if (isNaN(tenantId)) {
+    return res.status(400).json({ error: "ID do Tenant inválido." });
+  }
+
+  const {
+    maxDistanceKm,
+    fixedFee,
+    additionalKmFee,
+    fixedDistanceKm,
+    tempoMaxEntre,
+  } = req.body;
+
+  if (
+    !maxDistanceKm &&
+    !fixedFee &&
+    !additionalKmFee &&
+    !fixedDistanceKm &&
+    !tempoMaxEntre
+  ) {
+    return res.status(400).json({
+      error: "É necessário fornecer ao menos um campo para atualização.",
+    });
+  }
+
+  try {
+    const tenantZone = await prisma.zone.findUnique({
+      where: { tenantId: tenantId },
+    });
+
+    if (!tenantZone) {
+      return res.status(404).json({ error: "Tenant não encontrado." });
+    }
+
+    const data = {
+      maxDistanceKm: maxDistanceKm ?? tenantZone.maxDistanceKm,
+      fixedFee: fixedFee ?? tenantZone.fixedFee,
+      additionalKmFee: additionalKmFee ?? tenantZone.additionalKmFee,
+      fixedDistanceKm: fixedDistanceKm ?? tenantZone.fixedDistanceKm,
+      tempoMaxEntre: tempoMaxEntre ?? tenantZone.tempoMaxEntre,
+    };
+
+    const validationResult = updateTenantZoneSchema.safeParse(data);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Dados inválidos",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const updatedTenant = await prisma.zone.update({
+      where: { tenantId: tenantId },
+      data: validationResult.data,
+    });
+
+    res.status(200).json({
+      message: "Informações do tenantZone atualizadas com sucesso.",
+      tenant: updatedTenant,
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar informações do tenant:", error);
+    res.status(500).json({ error: "Erro ao atualizar informações do tenant." });
+  }
+};
+
+export const updateTenantEnder = async (req: Request, res: Response) => {
+  const tenantId = parseInt(req.params.tenantId, 10);
+
+  if (isNaN(tenantId)) {
+    return res.status(400).json({ error: "ID do Tenant inválido." });
+  }
+
+  const { cep, rua, cidade, estado, numero, bairro } = req.body;
+
+  if (!cep && !rua && !cidade && !estado && !numero && !bairro) {
+    return res.status(400).json({
+      error: "É necessário fornecer ao menos um campo para atualização.",
+    });
+  }
+
+  try {
+    const tenantInfo = await prisma.tenantInfo.findUnique({
+      where: { tenantId: tenantId },
+    });
+
+    if (!tenantInfo) {
+      return res.status(404).json({ error: "Tenant não encontrado." });
+    }
+
+    const data = {
+      cep: cep ?? tenantInfo.cep,
+      rua: rua ?? tenantInfo.rua,
+      numero: numero ?? tenantInfo.numero,
+      bairro: bairro ?? tenantInfo.bairro,
+      cidade: cidade ?? tenantInfo.cidade,
+      estado: estado ?? tenantInfo.estado,
+    };
+
+    const validationResult = updateTenantEndecSchema.safeParse(data);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Dados inválidos",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const updatedTenant = await prisma.tenantInfo.update({
+      where: { tenantId: tenantId },
+      data: validationResult.data,
+    });
+
+    res.status(200).json({
+      message: "Informações do tenant atualizadas com sucesso.",
+      tenant: updatedTenant,
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar informações do tenant:", error);
+    res.status(500).json({ error: "Erro ao atualizar informações do tenant." });
   }
 };

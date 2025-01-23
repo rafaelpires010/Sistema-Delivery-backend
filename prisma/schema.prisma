@@ -114,33 +114,33 @@ model Tenant {
 }
 
 model TenantInfo {
-  id            Int     @id @default(autoincrement())
-  cnpj          String
-  telefone      String?
-  whatsapp      String?
-  cep           String
-  rua           String
-  numero        String
-  cidade        String
-  estado        String
-  latitude      Float
-  longitude     Float
-  instagram     String?
-  tempoMaxEntre String?
+  id        Int     @id @default(autoincrement())
+  cnpj      String
+  telefone  String?
+  whatsapp  String?
+  cep       String
+  rua       String
+  numero    String
+  cidade    String
+  estado    String
+  latitude  Float
+  longitude Float
+  instagram String?
+  bairro    String
 
   tenantId Int    @unique
   tenant   Tenant @relation("TenantInfoRelation", fields: [tenantId], references: [id])
 }
 
 model Zone {
-  id              Int   @id @default(autoincrement())
-  tenantId        Int   @unique // Cada zona é associada a um único tenant, e vice-versa
+  id              Int    @id @default(autoincrement())
+  tenantId        Int    @unique // Cada zona é associada a um único tenant, e vice-versa
   maxDistanceKm   Float // Distância máxima para a zona
   fixedFee        Float // Taxa fixa de frete para a zona
   fixedDistanceKm Float // Distância que a taxa fixa cobre sem adicional
   additionalKmFee Float // Taxa adicional por quilômetro acima da distância fixa
-
-  tenant Tenant @relation("TenantZoneRelation", fields: [tenantId], references: [id])
+  tempoMaxEntre   Float?
+  tenant          Tenant @relation("TenantZoneRelation", fields: [tenantId], references: [id])
 }
 
 model Cupons {
