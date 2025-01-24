@@ -7,7 +7,7 @@
   "dev": "nodemon src/server.ts",
   "build": "tsc",
   "start": "node dist/server.js",
-  "vercel-build": "npx prisma migrate deploy && npx prisma generate && npm install"
+  "vercel-build": "npx prisma migrate deploy && npx prisma generate && npm rebuild argon2"
 },
   "author": "",
   "license": "ISC",
