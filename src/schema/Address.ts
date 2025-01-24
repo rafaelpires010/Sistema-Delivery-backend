@@ -10,6 +10,4 @@ export const addressSchema = z.object({
   id_cidade: z.number().int(),
   estado: z.string().min(2, "Estado deve ter no mínimo 2 caracteres"),
   complemento: z.string().optional(),
-  latitude: z.number(),
-  longitude: z.number(),
 });
