@@ -1,10 +1,10 @@
 import { Request, RequestHandler, Response } from "express";
 import { findUserByEmail } from "../services/user";
 import { createJWT, gerarToken } from "../middlewares/jwt";
-import argon2 from "argon2";
 import { ExtendedRequest } from "../types/extended-request";
 import { signinSchema } from "../schema/signin";
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 export const signin: RequestHandler = async (req, res) => {
@@ -19,7 +19,8 @@ export const signin: RequestHandler = async (req, res) => {
       return res.status(401).json({ error: "Dados inválidos" });
     }
 
-    const verifyPass = await argon2.verify(user.senha, safeData.data.senha);
+    // Verifica a senha usando bcrypt
+    const verifyPass = await bcrypt.compare(safeData.data.senha, user.senha);
     if (!verifyPass) {
       return res.status(401).json({ error: "Dados inválidos" });
     }

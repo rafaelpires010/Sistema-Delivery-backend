@@ -7,12 +7,12 @@ import {
   updateUser,
 } from "../services/user";
 import { createJWT, gerarToken } from "../middlewares/jwt";
-import argon2 from "argon2";
 import { signinSchema } from "../schema/signin";
 import { ExtendedRequest } from "../types/extended-request";
 import { sendPasswordResetEmail } from "../services/email";
 import crypto from "crypto";
 import { resetPasswordSchema } from "../schema/forgot";
+import bcrypt from "bcrypt";
 
 export const signup: RequestHandler = async (req, res) => {
   const safeData = signupSchema.safeParse(req.body);
@@ -38,7 +38,7 @@ export const signup: RequestHandler = async (req, res) => {
     }
 
     // Cria a senha com hash e o usuário
-    const hashPassword = await argon2.hash(safeData.data.senha);
+    const hashPassword = await bcrypt.hash(safeData.data.senha, 10); // 10 é o número de salt rounds
     const newUser = await creatUser({
       nome: safeData.data.nome,
       telefone: safeData.data.telefone,
@@ -79,7 +79,7 @@ export const signin: RequestHandler = async (req, res) => {
     return res.status(401).json({ error: "Dados inválidos" });
   }
 
-  const verifyPass = await argon2.verify(user.senha, safeData.data.senha);
+  const verifyPass = await bcrypt.compare(safeData.data.senha, user.senha); // Comparar a senha
   if (!verifyPass) {
     return res.status(401).json({ error: "Dados inválidos" });
   }
@@ -177,7 +177,7 @@ export const resetPassword: RequestHandler = async (req, res) => {
     }
 
     // Atualiza a senha do usuário e remove o token
-    const hashedPassword = await argon2.hash(newPassword);
+    const hashedPassword = await bcrypt.hash(newPassword, 10); // 10 salt rounds
     await updateUser(user.id, {
       senha: hashedPassword,
       resetToken: null,
