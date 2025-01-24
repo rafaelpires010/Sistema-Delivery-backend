@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const addressController_1 = require("../controllers/addressController");
+const router = (0, express_1.Router)();
+router.get("/:tenantSlug/addresses", addressController_1.getAddressByUser);
+router.get("/:tenantSlug/address/:id", addressController_1.getAddressById);
+router.post("/:tenantSlug/newaddress", addressController_1.createAddress);
+router.put("/:tenantSlug/address/:id", addressController_1.editAddress);
+router.delete("/:tenantSlug/address/:id", addressController_1.deleteAddress);
+exports.default = router;
