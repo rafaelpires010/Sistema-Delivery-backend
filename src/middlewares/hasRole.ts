@@ -7,23 +7,12 @@ const prisma = new PrismaClient();
 // Middleware de autorização para verificar o papel do usuário no tenant
 export const authorizeRole = (requiredRole: string) => {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const token = req.headers.authorization?.split(" ")[1]; // Extrai o token do cabeçalho Authorization
-    const { tenantSlug } = req.params; // ID do tenant vindo da rota
-
-    if (!token) {
-      return res
-        .status(401)
-        .json({ error: "Token de autenticação não fornecido." });
-    }
-
     try {
-      // Busca o tenant pelo slug
-      const tenant = await prisma.tenant.findUnique({
-        where: { slug: tenantSlug },
-      });
+      const token = req.headers.authorization?.split(" ")[1];
+      const { tenantSlug } = req.params;
 
-      if (!tenant) {
-        return res.status(404).json({ error: "Tenant não encontrado." });
+      if (!token) {
+        return res.status(401).json({ message: "Token não fornecido" });
       }
 
       const decoded = jwt.verify(
@@ -32,33 +21,39 @@ export const authorizeRole = (requiredRole: string) => {
       ) as {
         id: number;
       };
-      // Consulta o banco para obter o papel do usuário nesse tenant
-      const userTenant = await prisma.userTenant.findUnique({
+
+      // Primeiro encontra o userTenant
+      const userTenant = await prisma.userTenant.findFirst({
         where: {
-          userId_tenantId: {
-            userId: Number(decoded.id),
-            tenantId: Number(tenant.id),
+          userId: decoded.id,
+          tenant: {
+            slug: tenantSlug,
           },
         },
       });
 
       if (!userTenant) {
-        return res.status(403).json({
-          message: "Acesso negado: usuário não pertence a este tenant.",
-        });
-      }
-
-      // Verifica se o papel do usuário corresponde ao papel necessário
-      if (userTenant.role !== requiredRole) {
         return res
           .status(403)
-          .json({ message: "Acesso negado: permissão insuficiente." });
+          .json({ message: "Usuário não pertence ao tenant" });
+      }
+
+      // Verifica se o userTenant tem a role necessária
+      const hasRole = await prisma.tenantUserRoles.findFirst({
+        where: {
+          userTenantId: userTenant.id,
+          codigo: requiredRole,
+        },
+      });
+
+      if (!hasRole) {
+        return res.status(403).json({ message: "Permissão insuficiente" });
       }
 
       next();
     } catch (error) {
       console.error(error);
-      res.status(500).json({ message: "Erro ao verificar permissões." });
+      res.status(500).json({ message: "Erro ao verificar permissões" });
     }
   };
 };

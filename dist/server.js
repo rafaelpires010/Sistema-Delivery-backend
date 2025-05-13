@@ -17,13 +17,17 @@ const addressRouter_1 = __importDefault(require("./routes/addressRouter"));
 const path_1 = __importDefault(require("path"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const shippingRoutes_1 = __importDefault(require("./routes/shippingRoutes"));
+const bannerRoute_1 = __importDefault(require("./routes/bannerRoute"));
+const cupomRouter_1 = __importDefault(require("./routes/cupomRouter"));
+const formaPagamentoRouter_1 = __importDefault(require("./routes/formaPagamentoRouter"));
+const vendasRouter_1 = __importDefault(require("./routes/vendasRouter"));
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 // Defina suas rotas
 app.use("/admin", admin_1.default);
-app.use("/", tenantRouter_1.default, productRouter_1.default, categoriesRouter_1.default, orderRouter_1.default, addressRouter_1.default, auth_1.default, shippingRoutes_1.default);
+app.use("/", tenantRouter_1.default, productRouter_1.default, categoriesRouter_1.default, orderRouter_1.default, addressRouter_1.default, auth_1.default, shippingRoutes_1.default, bannerRoute_1.default, cupomRouter_1.default, formaPagamentoRouter_1.default, vendasRouter_1.default);
 app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "../uploads")));
 const regularServer = http_1.default.createServer(app); // Cria o servidor HTTP
 const io = new socket_io_1.Server(regularServer, {

@@ -12,6 +12,7 @@ const email_1 = require("../services/email");
 const crypto_1 = __importDefault(require("crypto"));
 const forgot_1 = require("../schema/forgot");
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const prisma_1 = require("../lib/prisma");
 const signup = async (req, res) => {
     const safeData = signup_1.signupSchema.safeParse(req.body);
     // Verifica erros de validação
@@ -82,20 +83,22 @@ const signin = async (req, res) => {
     });
 };
 exports.signin = signin;
-const authenticateUser = (req, // Utilize ExtendedRequest aqui
-res) => {
-    const user = req.user; // Acessa o usuário do req
-    // Verifica se o usuário existe
+const authenticateUser = async (req, res) => {
+    const user = req.user;
     if (!user) {
         return res.status(401).json({ error: "Usuário não autenticado." });
     }
-    // Retorna os dados do usuário
+    const userTenant = await prisma_1.prisma.userTenant.findFirst({
+        where: { userId: user.id },
+        select: { cargo: true },
+    });
     res.json({
         user: {
             nome: user.nome,
             email: user.email,
             telefone: user.telefone,
             id: user.id,
+            cargo: userTenant?.cargo,
         },
     });
 };

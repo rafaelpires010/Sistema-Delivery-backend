@@ -62,6 +62,7 @@ const getOrderById = async (req, res) => {
         const order = await prisma.order.findUnique({
             where: { id: Number(id) },
             include: {
+                cupom: true,
                 products: {
                     select: {
                         id_produto: true,
@@ -200,9 +201,8 @@ const getAllOrdersByUserAndTenant = async (req, res) => {
 exports.getAllOrdersByUserAndTenant = getAllOrdersByUserAndTenant;
 const createOrder = async (req, res) => {
     const { tenantSlug } = req.params;
-    const { id_user, id_address, metodo_pagamento, troco, preco, subtotal, data_order, status, products, statuses, shippingPrice, } = req.body;
+    const { id_user, id_address, metodo_pagamento, troco, preco, subtotal, data_order, status, products, statuses, shippingPrice, cupomId, origem, formaPagamentoId, } = req.body;
     try {
-        // Verifica se o tenant existe
         const tenant = await prisma.tenant.findUnique({
             where: { slug: tenantSlug },
         });
@@ -217,77 +217,86 @@ const createOrder = async (req, res) => {
         if (!userExists) {
             return res.status(404).json({ error: "Usuário não encontrado." });
         }
-        // Verifica se o endereço existe
-        const addressId = id_address;
-        const addressExists = await prisma.user_Address.findUnique({
-            where: { id: addressId },
-        });
-        if (!addressExists) {
-            return res.status(404).json({ error: "Endereço não encontrado." });
+        // Verifica endereço apenas se for DELIVERY
+        let addressId = null;
+        if (origem === "DELIVERY") {
+            addressId = id_address;
+            const addressExists = await prisma.user_Address.findUnique({
+                where: { id: addressId },
+            });
+            if (!addressExists) {
+                return res.status(404).json({ error: "Endereço não encontrado." });
+            }
         }
-        // Verifica se todos os produtos existem
+        // Verifica produtos
         const productIds = products.map((product) => product.id_produto);
         const productsExist = await prisma.product.findMany({
             where: { id: { in: productIds } },
         });
-        const existingProductIds = productsExist.map((product) => product.id);
-        const invalidProducts = productIds.filter((id) => !existingProductIds.includes(id));
-        if (invalidProducts.length > 0) {
+        if (productsExist.length !== productIds.length) {
             return res
                 .status(404)
                 .json({ error: "Um ou mais produtos não encontrados." });
         }
-        // Cria o novo pedido
-        const newOrder = await prisma.order.create({
+        // Verifica se a forma de pagamento existe e pertence ao tenant
+        const formaPagamento = await prisma.formasPagamento.findFirst({
+            where: {
+                id: formaPagamentoId,
+                tenantId: tenant.id,
+                ativo: true,
+            },
+        });
+        if (!formaPagamento) {
+            return res.status(400).json({
+                error: "Forma de pagamento não encontrada ou inativa",
+            });
+        }
+        // Cria o pedido
+        const order = await prisma.order.create({
             data: {
                 id_user: userId,
                 id_tenant: tenant.id,
                 id_address: addressId,
-                metodo_pagamento,
+                formaPagamentoId: formaPagamento.id,
                 troco,
+                shippingPrice,
                 preco,
                 subtotal,
-                data_order: new Date(data_order), // Certifique-se de que data_order está em um formato válido
-                status,
-                shippingPrice,
+                status: "received",
+                origem: "DELIVERY",
                 products: {
                     create: products.map((product) => ({
                         id_produto: product.id_produto,
-                        preco_produto: product.preco_produto,
                         nome_produto: product.nome_produto,
+                        preco_produto: product.preco_produto,
                         quantidade: product.quantidade,
                     })),
                 },
                 statuses: {
-                    create: statuses.map((status) => ({
-                        status: status.status,
-                        created_at: new Date(status.created_at), // Certifique-se de que status.created_at está em um formato válido
-                    })),
+                    create: {
+                        status: "received",
+                        created_at: new Date(),
+                    },
                 },
             },
-        });
-        // Emitir evento via socket
-        const io = req.app.get("socketio");
-        console.log("Emitindo novo pedido:", newOrder);
-        // Inclui os produtos e statuses no evento emitido
-        const orderData = {
-            ...newOrder,
-            user: {
-                nome: "Atualizar página",
+            include: {
+                products: true,
+                user: true,
+                address: true,
+                formaPagamento: true,
             },
-            products: products.map((product) => ({
-                id_produto: product.id_produto,
-                preco_produto: product.preco_produto,
-                nome_produto: product.nome_produto,
-                quantidade: product.quantidade,
-            })),
-            statuses: statuses.map((status) => ({
-                status: status.status,
-                created_at: new Date(status.created_at), // Certifique-se de que status.created_at está em um formato válido
-            })),
-        };
-        io.emit("newOrder", orderData);
-        return res.status(201).json(newOrder);
+        });
+        // Atualiza cupom se necessário
+        if (cupomId) {
+            await prisma.cupons.update({
+                where: { id: cupomId },
+                data: { usosAtuais: { increment: 1 } },
+            });
+        }
+        // Emite evento via socket
+        const io = req.app.get("socketio");
+        io.emit("newOrder", order);
+        return res.status(201).json(order);
     }
     catch (error) {
         console.error("Erro ao criar pedido:", error);

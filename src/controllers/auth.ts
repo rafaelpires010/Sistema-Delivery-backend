@@ -13,6 +13,7 @@ import { sendPasswordResetEmail } from "../services/email";
 import crypto from "crypto";
 import { resetPasswordSchema } from "../schema/forgot";
 import bcrypt from "bcrypt";
+import { prisma } from "../lib/prisma";
 
 export const signup: RequestHandler = async (req, res) => {
   const safeData = signupSchema.safeParse(req.body);
@@ -94,24 +95,28 @@ export const signin: RequestHandler = async (req, res) => {
   });
 };
 
-export const authenticateUser: RequestHandler = (
-  req: ExtendedRequest, // Utilize ExtendedRequest aqui
+export const authenticateUser: RequestHandler = async (
+  req: ExtendedRequest,
   res: Response
 ) => {
-  const user = req.user; // Acessa o usuário do req
+  const user = req.user;
 
-  // Verifica se o usuário existe
   if (!user) {
     return res.status(401).json({ error: "Usuário não autenticado." });
   }
 
-  // Retorna os dados do usuário
+  const userTenant = await prisma.userTenant.findFirst({
+    where: { userId: user.id },
+    select: { cargo: true },
+  });
+
   res.json({
     user: {
       nome: user.nome,
       email: user.email,
       telefone: user.telefone,
       id: user.id,
+      cargo: userTenant?.cargo,
     },
   });
 };

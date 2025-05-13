@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteCategory = exports.updateCategory = exports.createCategory = exports.getCategoryById = exports.getCategoriesByTenant = void 0;
+exports.toggleCategoryStatus = exports.deleteCategory = exports.updateCategory = exports.createCategory = exports.getCategoryById = exports.getCategoriesByTenantActive = exports.getCategoriesByTenant = void 0;
 const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
 const prisma = new client_1.PrismaClient();
@@ -30,6 +30,32 @@ const getCategoriesByTenant = async (req, res) => {
     }
 };
 exports.getCategoriesByTenant = getCategoriesByTenant;
+// Obter categorias ativas por tenant
+const getCategoriesByTenantActive = async (req, res) => {
+    const { tenantSlug } = req.params;
+    try {
+        // Verifica se o tenant existe
+        const tenant = await prisma.tenant.findUnique({
+            where: { slug: tenantSlug },
+        });
+        if (!tenant) {
+            return res.status(404).json({ error: "Tenant not found" });
+        }
+        // Busca as categorias associadas ao tenant
+        const categories = await prisma.category.findMany({
+            where: { id_tenant: tenant.id, ativo: true },
+        });
+        res.json(categories);
+    }
+    catch (error) {
+        console.error("Error fetching categories for tenant:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+    finally {
+        await prisma.$disconnect();
+    }
+};
+exports.getCategoriesByTenantActive = getCategoriesByTenantActive;
 // Obter uma categoria específica por ID e slug do tenant
 const getCategoryById = async (req, res) => {
     const { tenantSlug, categoryId } = req.params;
@@ -222,3 +248,52 @@ const deleteCategory = async (req, res) => {
     }
 };
 exports.deleteCategory = deleteCategory;
+//ativar/desativar categoria
+const toggleCategoryStatus = async (req, res) => {
+    const categoryId = parseInt(req.params.categoryId, 10);
+    const tenantSlug = req.params.tenantSlug;
+    if (isNaN(categoryId)) {
+        return res.status(400).json({ error: "ID da categoria inválido." });
+    }
+    try {
+        // Buscar o tenant pelo slug
+        const tenant = await prisma.tenant.findUnique({
+            where: { slug: tenantSlug },
+        });
+        if (!tenant) {
+            return res.status(404).json({ error: "Tenant não encontrado." });
+        }
+        // Buscar a categoria e verificar se pertence ao tenant
+        const category = await prisma.category.findFirst({
+            where: {
+                id: categoryId,
+                id_tenant: tenant.id,
+            },
+        });
+        if (!category) {
+            return res.status(404).json({
+                error: "Categoria não encontrada ou não pertence ao tenant.",
+            });
+        }
+        // Alternar o status da categoria
+        const updatedCategory = await prisma.category.update({
+            where: { id: categoryId },
+            data: {
+                ativo: !category.ativo, // Inverte o status atual
+            },
+        });
+        return res.status(200).json({
+            success: true,
+            message: `Categoria ${updatedCategory.ativo ? "ativada" : "desativada"} com sucesso.`,
+            data: updatedCategory,
+        });
+    }
+    catch (error) {
+        console.error("Erro ao ativar/desativar categoria:", error);
+        return res.status(500).json({
+            error: "Erro ao ativar/desativar categoria",
+            details: error,
+        });
+    }
+};
+exports.toggleCategoryStatus = toggleCategoryStatus;

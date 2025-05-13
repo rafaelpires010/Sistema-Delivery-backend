@@ -32,6 +32,37 @@ export const getCategoriesByTenant = async (req: Request, res: Response) => {
   }
 };
 
+// Obter categorias ativas por tenant
+export const getCategoriesByTenantActive = async (
+  req: Request,
+  res: Response
+) => {
+  const { tenantSlug } = req.params;
+
+  try {
+    // Verifica se o tenant existe
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+
+    // Busca as categorias associadas ao tenant
+    const categories = await prisma.category.findMany({
+      where: { id_tenant: tenant.id, ativo: true },
+    });
+
+    res.json(categories);
+  } catch (error) {
+    console.error("Error fetching categories for tenant:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
 // Obter uma categoria específica por ID e slug do tenant
 export const getCategoryById = async (req: Request, res: Response) => {
   const { tenantSlug, categoryId } = req.params;
@@ -257,5 +288,65 @@ export const deleteCategory: RequestHandler = async (
       .json({ error: "Erro ao deletar categoria", details: error });
   } finally {
     await prisma.$disconnect();
+  }
+};
+
+//ativar/desativar categoria
+export const toggleCategoryStatus: RequestHandler = async (
+  req: Request,
+  res: Response
+) => {
+  const categoryId = parseInt(req.params.categoryId, 10);
+  const tenantSlug = req.params.tenantSlug;
+
+  if (isNaN(categoryId)) {
+    return res.status(400).json({ error: "ID da categoria inválido." });
+  }
+
+  try {
+    // Buscar o tenant pelo slug
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant não encontrado." });
+    }
+
+    // Buscar a categoria e verificar se pertence ao tenant
+    const category = await prisma.category.findFirst({
+      where: {
+        id: categoryId,
+        id_tenant: tenant.id,
+      },
+    });
+
+    if (!category) {
+      return res.status(404).json({
+        error: "Categoria não encontrada ou não pertence ao tenant.",
+      });
+    }
+
+    // Alternar o status da categoria
+    const updatedCategory = await prisma.category.update({
+      where: { id: categoryId },
+      data: {
+        ativo: !category.ativo, // Inverte o status atual
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Categoria ${
+        updatedCategory.ativo ? "ativada" : "desativada"
+      } com sucesso.`,
+      data: updatedCategory,
+    });
+  } catch (error) {
+    console.error("Erro ao ativar/desativar categoria:", error);
+    return res.status(500).json({
+      error: "Erro ao ativar/desativar categoria",
+      details: error,
+    });
   }
 };

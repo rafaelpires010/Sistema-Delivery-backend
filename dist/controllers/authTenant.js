@@ -28,7 +28,14 @@ const signin = async (req, res) => {
         // Verifica se o usuário pertence a um tenant e obtém o role e o tenantId
         const userTenant = await prisma.userTenant.findFirst({
             where: { userId: user.id },
-            select: { tenantId: true, role: true },
+            select: {
+                tenantId: true,
+                roles: {
+                    select: {
+                        codigo: true,
+                    },
+                },
+            },
         });
         if (!userTenant) {
             return res.status(403).json({
@@ -42,7 +49,7 @@ const signin = async (req, res) => {
                 nome: user.nome,
                 email: user.email,
                 tenantId: userTenant.tenantId,
-                role: userTenant.role,
+                roles: userTenant.roles.map((r) => r.codigo),
             },
         });
     }
@@ -52,20 +59,22 @@ const signin = async (req, res) => {
     }
 };
 exports.signin = signin;
-const authenticateUser = (req, // Utilize ExtendedRequest aqui
-res) => {
-    const user = req.user; // Acessa o usuário do req
-    // Verifica se o usuário existe
+const authenticateUser = async (req, res) => {
+    const user = req.user;
     if (!user) {
         return res.status(401).json({ error: "Usuário não autenticado." });
     }
-    // Retorna os dados do usuário
+    const userTenant = await prisma.userTenant.findFirst({
+        where: { userId: user.id },
+        select: { cargo: true },
+    });
     res.json({
         user: {
             nome: user.nome,
             email: user.email,
             telefone: user.telefone,
             id: user.id,
+            cargo: userTenant?.cargo,
         },
     });
 };

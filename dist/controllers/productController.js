@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateProduct = exports.deleteProduct = exports.createProduct = exports.getProductById = exports.getProductsByTenant = void 0;
+exports.toggleProductStatus = exports.updateProduct = exports.deleteProduct = exports.createProduct = exports.getProductById = exports.getProductsByTenantActive = exports.getProductsByTenant = void 0;
 const client_1 = require("@prisma/client");
 const product_1 = require("../schema/product");
 const prisma = new client_1.PrismaClient();
@@ -35,6 +35,40 @@ const getProductsByTenant = async (req, res) => {
     }
 };
 exports.getProductsByTenant = getProductsByTenant;
+// Obter Produtos ativos por Tenant
+const getProductsByTenantActive = async (req, res) => {
+    try {
+        const tenantSlug = req.params.tenantSlug;
+        // Buscar o tenant pelo slug
+        const tenant = await prisma.tenant.findUnique({
+            where: { slug: tenantSlug },
+            include: {
+                products: {
+                    where: {
+                        ativo: true,
+                    },
+                    include: {
+                        category: true, // Inclui a categoria associada ao produto
+                    },
+                },
+            },
+        });
+        if (tenant) {
+            res.json(tenant.products);
+        }
+        else {
+            res.status(404).send("Tenant não encontrado");
+        }
+    }
+    catch (error) {
+        console.error("Erro ao obter produtos:", error);
+        res.status(500).send("Erro ao obter produtos");
+    }
+    finally {
+        await prisma.$disconnect();
+    }
+};
+exports.getProductsByTenantActive = getProductsByTenantActive;
 // Obter Produto por ID
 const getProductById = async (req, res) => {
     try {
@@ -255,3 +289,52 @@ const updateProduct = async (req, res) => {
     }
 };
 exports.updateProduct = updateProduct;
+//ativar/desativar produto
+const toggleProductStatus = async (req, res) => {
+    const productId = parseInt(req.params.productId, 10);
+    const tenantSlug = req.params.tenantSlug;
+    if (isNaN(productId)) {
+        return res.status(400).json({ error: "ID do produto inválido." });
+    }
+    try {
+        // Buscar o tenant pelo slug
+        const tenant = await prisma.tenant.findUnique({
+            where: { slug: tenantSlug },
+        });
+        if (!tenant) {
+            return res.status(404).json({ error: "Tenant não encontrado." });
+        }
+        // Buscar o produto e verificar se pertence ao tenant
+        const product = await prisma.product.findFirst({
+            where: {
+                id: productId,
+                id_tenant: tenant.id,
+            },
+        });
+        if (!product) {
+            return res.status(404).json({
+                error: "Produto não encontrado ou não pertence ao tenant.",
+            });
+        }
+        // Alternar o status do produto
+        const updatedProduct = await prisma.product.update({
+            where: { id: productId },
+            data: {
+                ativo: !product.ativo, // Inverte o status atual
+            },
+        });
+        return res.status(200).json({
+            success: true,
+            message: `Produto ${updatedProduct.ativo ? "ativado" : "desativado"} com sucesso.`,
+            data: updatedProduct,
+        });
+    }
+    catch (error) {
+        console.error("Erro ao ativar/desativar produto:", error);
+        return res.status(500).json({
+            error: "Erro ao ativar/desativar produto",
+            details: error,
+        });
+    }
+};
+exports.toggleProductStatus = toggleProductStatus;

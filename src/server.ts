@@ -14,6 +14,10 @@ import addressRouter from "./routes/addressRouter";
 import path from "path";
 import auth from "./routes/auth";
 import shippingRoutes from "./routes/shippingRoutes";
+import bannerRoute from "./routes/bannerRoute";
+import cupomRouter from "./routes/cupomRouter";
+import formaPagamentoRouter from "./routes/formaPagamentoRouter";
+import vendasRouter from "./routes/vendasRouter";
 
 const app = express();
 
@@ -31,7 +35,11 @@ app.use(
   orderRouter,
   addressRouter,
   auth,
-  shippingRoutes
+  shippingRoutes,
+  bannerRoute,
+  cupomRouter,
+  formaPagamentoRouter,
+  vendasRouter
 );
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 

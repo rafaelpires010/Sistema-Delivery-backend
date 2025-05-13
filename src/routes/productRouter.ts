@@ -1,17 +1,16 @@
 import express from "express";
 import {
-  getProductsByTenant,
+  getProductsByTenantActive,
   getProductById,
   createProduct,
   deleteProduct,
-  updateProduct,
 } from "../controllers/productController";
 import upload from "../middlewares/upload";
 
 const router = express.Router();
 
 // Rota para obter produtos por slug do tenant
-router.get("/:tenantSlug/products", getProductsByTenant);
+router.get("/:tenantSlug/products", getProductsByTenantActive);
 
 router.get("/:tenantSlug/products/:productId", getProductById);
 

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import {
-  getCategoriesByTenant,
+  getCategoriesByTenantActive,
   getCategoryById,
   createCategory,
   updateCategory,
@@ -10,7 +10,7 @@ import upload from "../middlewares/upload";
 
 const router = Router();
 
-router.get("/:tenantSlug/categories", getCategoriesByTenant);
+router.get("/:tenantSlug/categories", getCategoriesByTenantActive);
 
 router.get("/:tenantSlug/categories/:categoryId", getCategoryById);
 

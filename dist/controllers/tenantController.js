@@ -114,7 +114,11 @@ const getAllTenantByUser = async (req, res) => {
                         OnClose: true,
                     },
                 },
-                role: true, // Inclui o papel do usuário para o tenant
+                roles: {
+                    select: {
+                        codigo: true,
+                    },
+                },
             },
         });
         // Verifica se o usuário está associado a algum tenant
@@ -130,7 +134,7 @@ const getAllTenantByUser = async (req, res) => {
             slug: userTenant.tenant.slug,
             OnClose: userTenant.tenant.OnClose,
             img: userTenant.tenant.img,
-            role: userTenant.role,
+            roles: userTenant.roles.map((r) => r.codigo),
         }));
         res.status(200).json(tenantData);
     }

@@ -45,6 +45,7 @@
     "multer-s3": "^3.0.1",
     "nodemailer": "^6.9.16",
     "socket.io": "^4.7.5",
+    "whatsapp-web.js": "^1.27.0",
     "ws": "^8.18.0",
     "zod": "^3.23.8"
   }
