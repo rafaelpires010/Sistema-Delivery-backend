@@ -17,6 +17,7 @@ Este é o backend de um sistema de delivery **multitenant**, desenvolvido com **
 ## 📁 Estrutura do Projeto
 
 src/
+
 ├── controllers/ # Lógicas de negócio (ex: products, orders, auth)
 
 ├── middlewares/ # Autenticação, multitenant, erros
