@@ -18,18 +18,24 @@ Este é o backend de um sistema de delivery **multitenant**, desenvolvido com **
 
 src/
 ├── controllers/ # Lógicas de negócio (ex: products, orders, auth)
+
 ├── middlewares/ # Autenticação, multitenant, erros
+
 ├── routes/ # Definição de rotas
+
 ├── schemas/ # Validações com Zod
+
 ├── services/ # Regras de negócio reutilizáveis
+
 ├── prisma/ # Arquivos do Prisma (schema e client)
+
 ├── utils/ # Funções utilitárias
+
 ├── app.ts # Configuração do Express
+
 └── server.ts # Inicialização do servidor
 
-bash
-Copiar
-Editar
+
 
 ## 🧪 Como Rodar o Projeto
 
@@ -46,18 +52,30 @@ npm install
 Crie um arquivo .env com base no .env.example:
 
 PORT=9000
+
 DATABASE_URL="postgresql://postgres:1234@localhost:5432/DELIVERYDBS?schema=public"
+
 DEFAULT_TOKEN="exemple-47287482-35223454"
+
 BASE_URL="localhost:9000"
+
 AWS_ACCESS_KEY_ID=SUA CHAVE AWS
+
 AWS_SECRET_ACCESS_KEY=SUA CHAVE AWS
+
 AWS_REGION=us-east-2 # ou a região do seu bucket
+
 S3_BUCKET_NAME= NOME DO BUCKET NA AWS S3
 
+
 SMTP_HOST=SEU SERVIDOR DE EMAIL
+
 SMTP_PORT=587
+
 SMTP_USER=EMAIL 
+
 SMTP_PASSWORD=SENHA
+
 
 4. Gere e aplique as migrations
 
