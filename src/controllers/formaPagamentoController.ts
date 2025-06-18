@@ -29,7 +29,6 @@ export const getAllFormasPagamentoDelivery = async (
         nome: true,
         tipo: true,
         aceitaTroco: true,
-        aceitaIntegracao: true,
         ativo: true,
       },
       orderBy: {
@@ -66,46 +65,14 @@ export const getAllFormasPagamento = async (req: Request, res: Response) => {
       where: {
         tenantId: tenant.id,
       },
-      include: {
-        pdvs: {
-          include: {
-            frenteCaixa: {
-              select: {
-                pdv: true,
-                status: true,
-              },
-            },
-          },
-        },
-      },
       orderBy: {
         nome: "asc",
       },
     });
 
-    const formatadasFormasPagamento = formasPagamento.map((forma) => ({
-      id: forma.id,
-      nome: forma.nome,
-      tipo: forma.tipo,
-      aceitaTroco: forma.aceitaTroco,
-      aceitaIntegracao: forma.aceitaIntegracao,
-      api_key: forma.api_key,
-      merchant_id: forma.merchant_id,
-      terminal_id: forma.terminal_id,
-      integracao: forma.integracao,
-      delivery: forma.delivery,
-      ativo: forma.ativo,
-      pdvs: forma.pdvs.map((pdv) => ({
-        id: pdv.frenteCaixaId,
-        nome: pdv.frenteCaixa.pdv,
-        status: pdv.frenteCaixa.status,
-        ativo: pdv.ativo,
-      })),
-    }));
-
     return res.status(200).json({
       success: true,
-      data: formatadasFormasPagamento,
+      data: formasPagamento,
     });
   } catch (error) {
     console.error("Erro ao buscar formas de pagamento:", error);
@@ -119,18 +86,7 @@ export const getAllFormasPagamento = async (req: Request, res: Response) => {
 export const criarNovaFormaPagamento = async (req: Request, res: Response) => {
   try {
     const { tenantSlug } = req.params;
-    const {
-      nome,
-      tipo,
-      aceitaTroco,
-      aceitaIntegracao,
-      api_key,
-      merchant_id,
-      terminal_id,
-      integracao,
-      delivery,
-      ativo = true,
-    } = req.body;
+    const { nome, tipo, aceitaTroco, delivery = true, ativo = true } = req.body;
 
     const tenant = await prisma.tenant.findUnique({
       where: { slug: tenantSlug },
@@ -153,11 +109,6 @@ export const criarNovaFormaPagamento = async (req: Request, res: Response) => {
         nome,
         tipo,
         aceitaTroco: aceitaTroco || false,
-        aceitaIntegracao: aceitaIntegracao || false,
-        api_key,
-        merchant_id,
-        terminal_id,
-        integracao,
         delivery: delivery || false,
         ativo,
         tenant: {
@@ -175,11 +126,6 @@ export const criarNovaFormaPagamento = async (req: Request, res: Response) => {
         nome: novaFormaPagamento.nome,
         tipo: novaFormaPagamento.tipo,
         aceitaTroco: novaFormaPagamento.aceitaTroco,
-        aceitaIntegracao: novaFormaPagamento.aceitaIntegracao,
-        api_key: novaFormaPagamento.api_key,
-        merchant_id: novaFormaPagamento.merchant_id,
-        terminal_id: novaFormaPagamento.terminal_id,
-        integracao: novaFormaPagamento.integracao,
         delivery: novaFormaPagamento.delivery,
         ativo: novaFormaPagamento.ativo,
       },
@@ -196,18 +142,7 @@ export const criarNovaFormaPagamento = async (req: Request, res: Response) => {
 export const editarFormaPagamento = async (req: Request, res: Response) => {
   try {
     const { tenantSlug, formaPagamentoId } = req.params;
-    const {
-      nome,
-      tipo,
-      aceitaTroco,
-      aceitaIntegracao,
-      api_key,
-      merchant_id,
-      terminal_id,
-      integracao,
-      delivery,
-      ativo,
-    } = req.body;
+    const { nome, tipo, aceitaTroco, delivery = true, ativo } = req.body;
 
     const tenant = await prisma.tenant.findUnique({
       where: { slug: tenantSlug },
@@ -247,11 +182,6 @@ export const editarFormaPagamento = async (req: Request, res: Response) => {
         nome,
         tipo,
         aceitaTroco,
-        aceitaIntegracao,
-        api_key,
-        merchant_id,
-        terminal_id,
-        integracao,
         delivery,
         ativo,
       },
@@ -264,11 +194,6 @@ export const editarFormaPagamento = async (req: Request, res: Response) => {
         nome: formaPagamentoAtualizada.nome,
         tipo: formaPagamentoAtualizada.tipo,
         aceitaTroco: formaPagamentoAtualizada.aceitaTroco,
-        aceitaIntegracao: formaPagamentoAtualizada.aceitaIntegracao,
-        api_key: formaPagamentoAtualizada.api_key,
-        merchant_id: formaPagamentoAtualizada.merchant_id,
-        terminal_id: formaPagamentoAtualizada.terminal_id,
-        integracao: formaPagamentoAtualizada.integracao,
         delivery: formaPagamentoAtualizada.delivery,
         ativo: formaPagamentoAtualizada.ativo,
       },

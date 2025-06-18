@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 export const createVenda = async (req: Request, res: Response) => {
   try {
     const { tenantSlug } = req.params;
-    const { orderId, valor, formaPagamentoId, pdvId, operadorId } = req.body;
+    const { orderId, valor, formaPagamentoId, operadorId } = req.body;
 
     // Busca o userTenant do operador
     const userTenant = await prisma.userTenant.findFirst({
@@ -34,23 +34,6 @@ export const createVenda = async (req: Request, res: Response) => {
 
     if (!order) {
       return res.status(404).json({ error: "Pedido não encontrado" });
-    }
-
-    // Se for venda PDV, verifica se o PDV está aberto
-    if (pdvId) {
-      const pdv = await prisma.pdvFrenteDeCaixa.findFirst({
-        where: {
-          id: pdvId,
-          status: "ABERTO",
-          userTenantId: userTenant.id,
-        },
-      });
-
-      if (!pdv) {
-        return res.status(400).json({
-          error: "PDV não encontrado ou não está aberto para este operador",
-        });
-      }
     }
 
     // Verifica se a forma de pagamento existe e pertence ao tenant
@@ -88,11 +71,6 @@ export const createVenda = async (req: Request, res: Response) => {
           formaPagamento: {
             connect: { id: formaPagamento.id },
           },
-          frenteCaixa: pdvId
-            ? {
-                connect: { id: pdvId },
-              }
-            : undefined,
           operador: operadorId
             ? {
                 connect: { id: operadorId },
@@ -178,11 +156,6 @@ export const alteraStatusVenda = async (req: Request, res: Response) => {
                 nome: true,
               },
             },
-          },
-        },
-        frenteCaixa: {
-          select: {
-            pdv: true,
           },
         },
         formaPagamento: true,
@@ -274,11 +247,6 @@ export const confirmaVenda = async (req: Request, res: Response) => {
                 nome: true,
               },
             },
-          },
-        },
-        frenteCaixa: {
-          select: {
-            pdv: true,
           },
         },
         formaPagamento: true,
@@ -378,11 +346,6 @@ export const cancelarVenda = async (req: Request, res: Response) => {
                 nome: true,
               },
             },
-          },
-        },
-        frenteCaixa: {
-          select: {
-            pdv: true,
           },
         },
         formaPagamento: true,

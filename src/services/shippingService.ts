@@ -15,7 +15,7 @@ export async function calculateShippingCost(
     });
 
     if (!tenantInfo) {
-      return "Informações do Tenant não encontradas.";
+      return { error: "Informações do Tenant não encontradas." };
     }
 
     console.log("Tenant Info:", tenantInfo);
@@ -40,24 +40,22 @@ export async function calculateShippingCost(
 
     for (const zone of zones) {
       if (distanceKm <= zone.maxDistanceKm) {
+        let totalFee = zone.fixedFee;
         // Verifica se a distância está dentro da cobertura da taxa fixa
-        if (distanceKm <= zone.fixedDistanceKm) {
-          return zone.fixedFee;
+        if (distanceKm > zone.fixedDistanceKm) {
+          // Calcula a taxa fixa + taxa adicional por zona
+          const extraDistance = distanceKm - zone.fixedDistanceKm;
+          const additionalFee = Math.ceil(extraDistance) * zone.additionalKmFee;
+          totalFee += additionalFee;
         }
-        // Calcula a taxa fixa + taxa adicional por zona
-        const extraDistance = distanceKm - zone.fixedDistanceKm;
-
-        // Se a distância exceder a distância fixa, aplica a taxa adicional por zona inteira
-        const additionalFee = extraDistance > 0 ? zone.additionalKmFee : 0;
-
-        // A taxa total será a taxa fixa + a taxa adicional por zona
-        const totalFee = zone.fixedFee + additionalFee;
-
-        return totalFee;
+        return {
+          cost: totalFee,
+          deliveryTime: zone.tempoMaxEntre,
+        };
       }
     }
 
-    return "Etabelecimento não atende a sua região :(";
+    return { error: "Etabelecimento não atende a sua região :(" };
   } catch (error) {
     console.error("Erro ao calcular o frete:", error);
     throw error; // Rethrow para ser capturado no controller

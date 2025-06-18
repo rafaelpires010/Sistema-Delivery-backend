@@ -3,6 +3,6 @@ import { validateCupom } from "../controllers/CuponsController";
 
 const router = express.Router();
 
-router.get("/:tenantSlug/cupomValidate/:codigo", validateCupom);
+router.post("/:tenantSlug/cupomValidate/:codigo", validateCupom);
 
 export default router;

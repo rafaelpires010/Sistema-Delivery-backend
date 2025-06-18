@@ -30,8 +30,8 @@ model User {
 
 model User_Address {
   id          Int     @id @default(autoincrement())
-  user        User    @relation(fields: [id_user], references: [id])
-  id_user     Int
+  user        User?   @relation(fields: [id_user], references: [id])
+  id_user     Int?
   rua         String
   numero      String
   cep         String
@@ -40,7 +40,6 @@ model User_Address {
   id_cidade   Int
   estado      String
   complemento String?
-  Order       Order[]
 }
 
 model District {
@@ -57,33 +56,40 @@ model Order {
   id_user          Int?
   tenant           Tenant          @relation(fields: [id_tenant], references: [id])
   id_tenant        Int
-  address          User_Address?   @relation(fields: [id_address], references: [id])
-  id_address       Int? // Agora é opcional
+  orderAddress     OrderAddress?
   formaPagamento   formasPagamento @relation(fields: [formaPagamentoId], references: [id])
   formaPagamentoId Int
   troco            Float
   shippingPrice    Float
   preco            Float
   subtotal         Float
-  data_order       DateTime        @default(now())
   status           String
   origem           String // PDV01, PDV02, DELIVERY
   cupomId          Int?
+  observacao       String?
+  tempo_estimado   Int
+  dataHora_order   DateTime        @default(now())
+  dataHora_entrega DateTime?
+  is_retirada      Boolean         @default(false)
+  guestToken       String?         @unique
+  guestTokenExpiry DateTime?
   cupom            Cupons?         @relation(fields: [cupomId], references: [id])
   products         Order_Product[]
   statuses         Order_Status[]
   venda            Venda?
+  order_user       Order_User?
 }
 
 model Order_Product {
-  id            Int     @id @default(autoincrement())
-  order         Order   @relation(fields: [id_order], references: [id])
+  id            Int          @id @default(autoincrement())
+  order         Order        @relation(fields: [id_order], references: [id])
   id_order      Int
-  product       Product @relation(fields: [id_produto], references: [id])
+  product       Product      @relation(fields: [id_produto], references: [id])
   id_produto    Int
   nome_produto  String
   preco_produto Float
   quantidade    Int
+  complements   Complement[]
 }
 
 model Order_Status {
@@ -94,36 +100,53 @@ model Order_Status {
   created_at DateTime
 }
 
-model Tenant {
-  id           Int      @id @default(autoincrement())
-  slug         String   @unique
-  status       Boolean  @default(true)
-  OnClose      Boolean
-  nome         String
-  main_color   String
-  second_color String
-  img          String?
-  limite_pdvs  Int      @default(0) // Novo campo
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+model OrderAddress {
+  id          Int     @id @default(autoincrement())
+  rua         String
+  numero      String
+  cep         String
+  bairro      String
+  cidade      String
+  estado      String
+  complemento String?
+  order       Order   @relation(fields: [orderId], references: [id])
+  orderId     Int     @unique
+}
 
+model Order_User {
+  id       Int    @id @default(autoincrement())
+  nome     String
+  telefone String
+  email    String
+  order    Order  @relation(fields: [orderId], references: [id])
+  orderId  Int    @unique
+}
+
+model Tenant {
+  id                  Int                  @id @default(autoincrement())
+  slug                String               @unique
+  status              Boolean              @default(true)
+  OnClose             Boolean
+  nome                String
+  main_color          String
+  img                 String?
+  created_at          DateTime             @default(now())
+  updated_at          DateTime             @updatedAt
   tenantInfo          TenantInfo?          @relation("TenantInfoRelation")
   tenantFuncionamento TenantFuncionamento? @relation("TenantFuncionamentoRelation")
-  tipoRece            TenantTipoRece[]
-
-  districts          District[]
-  products           Product[]
-  banners            Banner[]
-  Order              Order[]
-  Category           Category[]
-  users              UserTenant[]
-  zone               Zone?               @relation("TenantZoneRelation")
-  cupons             Cupons[]
-  campanhas          Campanhas[]
-  frenteCaixas       PdvFrenteDeCaixa[]
-  Venda              Venda[]
-  formasPagamento    formasPagamento[]
-  tenantsFaturamento TenantsFaturamento?
+  districts           District[]
+  products            Product[]
+  banners             Banner[]
+  Order               Order[]
+  Category            Category[]
+  users               UserTenant[]
+  zone                Zone?                @relation("TenantZoneRelation")
+  cupons              Cupons[]
+  campanhas           Campanhas[]
+  Venda               Venda[]
+  formasPagamento     formasPagamento[]
+  tenantsFaturamento  TenantsFaturamento?
+  complements         Complements[]
 }
 
 model TenantInfo {
@@ -195,26 +218,44 @@ model TenantFuncionamento {
   tenant   Tenant @relation("TenantFuncionamentoRelation", fields: [tenantId], references: [id]) // Relacionamento 1-para-1 com Tenant
 }
 
-model TenantTipoRece {
-  id       Int    @id @default(autoincrement())
-  tipoRece String
-
-  tenantId Int
-  tenant   Tenant @relation(fields: [tenantId], references: [id]) // Relacionamento muitos-para-1 com Tenant
+model Product {
+  id           Int             @id @default(autoincrement())
+  tenant       Tenant          @relation(fields: [id_tenant], references: [id])
+  id_tenant    Int
+  category     Category        @relation(fields: [id_category], references: [id])
+  id_category  Int
+  ativo        Boolean         @default(true)
+  nome         String
+  img          String?
+  preco        Float
+  descricao    String?
+  isComplement Boolean         @default(false) // <--- NOVO CAMPO
+  orders       Order_Product[]
+  complements  Complements[]
+  Complement   Complement[]
 }
 
-model Product {
-  id          Int             @id @default(autoincrement())
-  tenant      Tenant          @relation(fields: [id_tenant], references: [id])
+model Complements {
+  id          Int          @id @default(autoincrement())
+  tenant      Tenant       @relation(fields: [id_tenant], references: [id])
   id_tenant   Int
-  category    Category        @relation(fields: [id_category], references: [id])
-  id_category Int
-  ativo       Boolean         @default(true)
+  ativo       Boolean      @default(true)
   nome        String
-  img         String
-  preco       Float
-  descricao   String?
-  orders      Order_Product[]
+  min_escolha Int?
+  max_escolha Int?
+  products    Product[]
+  items       Complement[]
+}
+
+model Complement {
+  id            Int             @id @default(autoincrement())
+  ativo         Boolean         @default(true)
+  complementsId Int
+  productId     Int
+  max_escolha   Int?
+  complements   Complements     @relation(fields: [complementsId], references: [id], onDelete: Cascade)
+  product       Product         @relation(fields: [productId], references: [id])
+  orderProducts Order_Product[]
 }
 
 model Category {
@@ -264,23 +305,17 @@ model TenantUserClaims {
 }
 
 model UserTenant {
-  id            Int                @id @default(autoincrement())
-  userId        Int
-  tenantId      Int
-  operadorId    String?
-  operadorSenha String?
-  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  roles         TenantUserRoles[]
-  claims        TenantUserClaims[]
-  active        Boolean            @default(true)
-  cargo         String?
-  ultimo_login  DateTime?
-  FrenteDeCaixa PdvFrenteDeCaixa[]
-  Sangria       PdvSangria[]
-  Suprimento    PdvSuprimento[]
-  Venda         Venda[]
-  CaixaOperacao PdvCaixaOperacao[]
+  id           Int                @id @default(autoincrement())
+  userId       Int
+  tenantId     Int
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  roles        TenantUserRoles[]
+  claims       TenantUserClaims[]
+  active       Boolean            @default(true)
+  cargo        String?
+  ultimo_login DateTime?
+  Venda        Venda[]
 
   valoresFaturamentoId Int?
 
@@ -299,104 +334,33 @@ model Campanhas {
   tenant    Tenant  @relation(fields: [tenantId], references: [id])
 }
 
-model PdvCaixaOperacao {
-  id             Int              @id @default(autoincrement())
-  frenteCaixa    PdvFrenteDeCaixa @relation(fields: [frenteCaixaId], references: [id])
-  frenteCaixaId  Int
-  operador       UserTenant       @relation(fields: [operadorId], references: [id])
-  operadorId     Int
-  tipo           String // ABERTURA, FECHAMENTO
-  valorInicial   Float? // Valor no momento da abertura
-  valorFinal     Float? // Valor no momento do fechamento
-  observacao     String?
-  dataAbertura   DateTime?
-  dataFechamento DateTime?
-  data           DateTime         @default(now())
-}
-
-model PdvFormasPagamento {
-  id               Int              @id @default(autoincrement())
-  frenteCaixa      PdvFrenteDeCaixa @relation(fields: [frenteCaixaId], references: [id])
-  frenteCaixaId    Int
-  formaPagamento   formasPagamento  @relation(fields: [formaPagamentoId], references: [id])
-  formaPagamentoId Int
-  ativo            Boolean          @default(true)
-
-  @@unique([frenteCaixaId, formaPagamentoId])
-}
-
-model PdvFrenteDeCaixa {
-  id              Int                  @id @default(autoincrement())
-  tenant          Tenant               @relation(fields: [tenantId], references: [id])
-  tenantId        Int
-  pdv             String
-  status          String // ABERTO, FECHADO
-  sangrias        PdvSangria[]
-  suprimentos     PdvSuprimento[]
-  vendas          Venda[]
-  operacoes       PdvCaixaOperacao[]
-  UserTenant      UserTenant?          @relation(fields: [userTenantId], references: [id])
-  userTenantId    Int?
-  formasPagamento PdvFormasPagamento[] // Nova relação
-}
-
-model PdvSangria {
-  id            Int              @id @default(autoincrement())
-  frenteCaixa   PdvFrenteDeCaixa @relation(fields: [frenteCaixaId], references: [id])
-  frenteCaixaId Int
-  valor         Float
-  motivo        String
-  data          DateTime         @default(now())
-  operador      UserTenant       @relation(fields: [operadorId], references: [id])
-  operadorId    Int
-}
-
-model PdvSuprimento {
-  id            Int              @id @default(autoincrement())
-  frenteCaixa   PdvFrenteDeCaixa @relation(fields: [frenteCaixaId], references: [id])
-  frenteCaixaId Int
-  valor         Float
-  motivo        String
-  data          DateTime         @default(now())
-  operador      UserTenant       @relation(fields: [operadorId], references: [id])
-  operadorId    Int
-}
-
 model Venda {
-  id               Int               @id @default(autoincrement())
+  id               Int             @id @default(autoincrement())
   nrVenda          String
-  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  tenant           Tenant          @relation(fields: [tenantId], references: [id])
   tenantId         Int
-  frenteCaixa      PdvFrenteDeCaixa? @relation(fields: [frenteCaixaId], references: [id])
-  frenteCaixaId    Int?
   valor            Float
   status           String // PENDENTE, PAGA, CANCELADA
-  formaPagamento   formasPagamento   @relation(fields: [formaPagamentoId], references: [id])
+  formaPagamento   formasPagamento @relation(fields: [formaPagamentoId], references: [id])
   formaPagamentoId Int
-  data             DateTime          @default(now())
-  operador         UserTenant?       @relation(fields: [operadorId], references: [id])
+  data             DateTime        @default(now())
+  operador         UserTenant?     @relation(fields: [operadorId], references: [id])
   operadorId       Int?
-  order            Order             @relation(fields: [orderId], references: [id])
-  orderId          Int               @unique
+  order            Order           @relation(fields: [orderId], references: [id])
+  orderId          Int             @unique
 }
 
 model formasPagamento {
-  id               Int                  @id @default(autoincrement())
-  nome             String
-  tipo             String // CREDITO, DEBITO, PIX, BOLETO, DINHEIRO
-  aceitaTroco      Boolean              @default(false)
-  aceitaIntegracao Boolean              @default(false)
-  api_key          String?
-  merchant_id      String?
-  terminal_id      String?
-  integracao       String? // PIX, BOLETO, DINHEIRO
-  delivery         Boolean              @default(false)
-  tenant           Tenant               @relation(fields: [tenantId], references: [id])
-  tenantId         Int
-  vendas           Venda[]
-  orders           Order[]
-  ativo            Boolean              @default(true)
-  pdvs             PdvFormasPagamento[] // Nova relação
+  id          Int     @id @default(autoincrement())
+  nome        String
+  tipo        String // CREDITO, DEBITO, PIX, BOLETO, DINHEIRO
+  aceitaTroco Boolean @default(false)
+  delivery    Boolean @default(false)
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  tenantId    Int
+  vendas      Venda[]
+  orders      Order[]
+  ativo       Boolean @default(true)
 }
 
 model TenantsFaturamento {

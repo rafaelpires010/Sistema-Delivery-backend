@@ -9,7 +9,7 @@ const cupomSchema = z.object({
   codigo: z.string(),
   desconto: z.number(),
   tipoDesconto: z.string(),
-  validade: z.string().datetime().optional(),
+  validade: z.string().datetime().optional().nullable(),
   dataInicio: z.string().datetime().optional(),
   limiteUso: z.number().optional(),
   usosAtuais: z.number().optional(),
@@ -235,7 +235,12 @@ export const validateCupom: RequestHandler = async (
 ) => {
   try {
     const { codigo } = req.params;
-    const tenantSlug = req.params.tenantSlug;
+    const { tenantSlug } = req.params;
+    const { subtotal } = req.body; // Recebe o subtotal do corpo da requisição
+
+    if (typeof subtotal !== "number" || subtotal < 0) {
+      return res.status(400).json({ message: "Subtotal inválido." });
+    }
 
     // Buscar tenant
     const tenant = await prisma.tenant.findUnique({
@@ -278,6 +283,15 @@ export const validateCupom: RequestHandler = async (
       return res
         .status(400)
         .json({ message: "Limite de uso do cupom atingido" });
+    }
+
+    // Verificar valor mínimo do pedido
+    if (cupom.valorMinimo && subtotal < cupom.valorMinimo) {
+      return res.status(400).json({
+        message: `O pedido mínimo para usar este cupom é de R$ ${cupom.valorMinimo.toFixed(
+          2
+        )}`,
+      });
     }
 
     // Cupom válido

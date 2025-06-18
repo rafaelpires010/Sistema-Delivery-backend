@@ -9,13 +9,20 @@ export async function calculateShippingHandler(req: Request, res: Response) {
       return res.status(400).json({ error: "Parâmetros incompletos." });
     }
 
-    const shippingCost = await calculateShippingCost(
+    const shippingInfo = await calculateShippingCost(
       tenantId,
       userLatitude,
       userLongitude
     );
 
-    return res.status(200).json({ shippingCost });
+    if ("error" in shippingInfo) {
+      return res.status(404).json({ error: shippingInfo.error });
+    }
+
+    return res.status(200).json({
+      shippingCost: shippingInfo.cost,
+      deliveryTime: shippingInfo.deliveryTime,
+    });
   } catch (error: unknown) {
     // Verifica se o erro é uma instância de Error
     if (error instanceof Error) {

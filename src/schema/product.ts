@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const createProductSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
-  img: z.string().url("Imagem deve ser uma URL válida"),
+  img: z.string().url("Imagem deve ser uma URL válida").nullable().optional(),
   id_category: z
     .number()
     .int()
@@ -10,11 +10,12 @@ export const createProductSchema = z.object({
   preco: z.number().positive("Preço deve ser um valor positivo"),
   descricao: z.string().optional(),
   id_tenant: z.number().int().positive("ID do tenant é obrigatório"),
+  isComplement: z.boolean().optional(),
 });
 
 export const updateProductSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório").optional(),
-  img: z.string().url("Imagem deve ser uma URL válida").optional(),
+  img: z.string().url("Imagem deve ser uma URL válida").nullable().optional(),
   id_category: z
     .number()
     .int()
@@ -22,4 +23,5 @@ export const updateProductSchema = z.object({
     .optional(),
   preco: z.number().positive("Preço deve ser um valor positivo").optional(),
   descricao: z.string().optional(),
+  isComplement: z.boolean().optional(),
 });

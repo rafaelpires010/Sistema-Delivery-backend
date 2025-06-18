@@ -68,21 +68,6 @@ import {
   getAllClaims,
   getAllRoles,
 } from "../../controllers/rolesClaimsController";
-import {
-  abrirCaixa,
-  fecharCaixa,
-  registrarSangria,
-  registrarSuprimento,
-  getCaixaAtual,
-  createPdv,
-  getAllPdvs,
-  registrarOrderAndVendaPdv,
-  trocarOperador,
-  cancelarVendaPdv,
-  cancelarUltimaVendaPdv,
-  reimprimirUltimoCupom,
-  reimprimirCupomEspecifico,
-} from "../../controllers/pdvController";
 import { createVenda, cancelarVenda } from "../../controllers/vendasController";
 import {
   getAllFormasPagamentoDelivery,
@@ -96,9 +81,25 @@ import {
   alteraStatusVenda,
   confirmaVenda,
 } from "../../controllers/vendasController";
-import { getAllVendasByData } from "../../controllers/relatorioVendasController";
-import { getAllProdutosByData } from "../../controllers/relatorioProdutosController";
-import { verifyOperador } from "../../middlewares/verifyOperador";
+import {
+  getRelatorioByData,
+  getResumoRelatorio,
+  getDashboardData,
+} from "../../controllers/relatorioProdutosController";
+
+import {
+  createComplementsGroup,
+  getAllComplementsGroups,
+  getComplementsGroupById,
+  updateComplementsGroup,
+  deleteComplementsGroup,
+} from "../../controllers/complementsController";
+import {
+  linkComplementToGroup,
+  unlinkComplementFromGroup,
+  getLinkedProducts,
+} from "../../controllers/complementController";
+
 const router = Router();
 
 //LOGIN
@@ -111,7 +112,7 @@ router.get("/ping", (req, res) => res.json({ pong: true, admin: true }));
 
 router.get("/:tenantSlug", verifyJWT, getTenantBySlug);
 
-router.get("/user/tenants", getAllTenantByUser);
+router.get("/user/tenants", verifyJWT, getAllTenantByUser);
 
 router.get("/:tenantSlug/products", verifyJWT, getProductsByTenant);
 
@@ -172,12 +173,7 @@ router.put(
 //Rotas Order
 
 // Rota para obter todos os pedidos de um tenant específico
-router.get(
-  "/:tenantSlug/orders",
-  verifyJWT,
-  authorizeRole("DFGD98G87DHG897FD"),
-  getAllOrders
-);
+router.get("/:tenantSlug/orders", verifyJWT, getAllOrders);
 
 // Rota para criar um novo pedido para um tenant específico
 router.post("/:tenantSlug/order", verifyJWT, createOrder);
@@ -186,12 +182,7 @@ router.post("/:tenantSlug/order", verifyJWT, createOrder);
 router.get("/:tenantSlug/order/:id", verifyJWT, getOrderById);
 
 // Rota para atualizar o status de um pedido específico
-router.put(
-  "/:tenantSlug/order/status/:orderId",
-  verifyJWT,
-  authorizeClaim("HFDS7S87FGS8943WHJOWEGO"),
-  updateOrderStatus
-);
+router.put("/:tenantSlug/order/status/:orderId", verifyJWT, updateOrderStatus);
 
 //Rotas Products
 
@@ -219,6 +210,31 @@ router.put(
   "/:tenantSlug/products/:productId/toggle-status",
   verifyJWT,
   toggleProductStatus
+);
+
+//Rotas Complements
+
+// Rotas para grupos de complementos
+router.post("/:tenantSlug/groups", verifyJWT, createComplementsGroup);
+router.get("/:tenantSlug/groups", verifyJWT, getAllComplementsGroups);
+router.get("/:tenantSlug/groups/:groupId", verifyJWT, getComplementsGroupById);
+router.put("/:tenantSlug/groups/:groupId", verifyJWT, updateComplementsGroup);
+router.delete(
+  "/:tenantSlug/groups/:groupId",
+  verifyJWT,
+  deleteComplementsGroup
+);
+
+// Rotas para complementos
+router.post("/:tenantSlug/complements/link", verifyJWT, linkComplementToGroup);
+router.delete(
+  "/:tenantSlug/complements/:complementsId/products/:productId",
+  verifyJWT,
+  unlinkComplementFromGroup
+);
+router.get(
+  "/:tenantSlug/complements/:complementsId/products",
+  getLinkedProducts
 );
 
 //Rotas Banner
@@ -269,42 +285,6 @@ router.get("/:tenantSlug/usersTenant", verifyJWT, findUsersByLoggedUserTenants);
 router.post("/:tenantSlug/users", verifyJWT, createUser);
 router.put("/users/:userId/toggle-status", verifyJWT, toggleUserStatus);
 
-// Rotas PDV
-router.get("/:tenantSlug/pdvs", verifyJWT, getAllPdvs);
-router.post("/:tenantSlug/pdv/create", verifyJWT, createPdv);
-router.post(
-  "/:tenantSlug/pdv/caixa/abrir",
-  verifyJWT,
-  verifyOperador,
-  abrirCaixa
-);
-router.post("/:tenantSlug/pdv/caixa/fechar", verifyJWT, fecharCaixa);
-router.post("/:tenantSlug/pdv/caixa/sangria", registrarSangria);
-router.post("/:tenantSlug/pdv/caixa/suprimento", registrarSuprimento);
-router.post("/:tenantSlug/pdv/caixa/atual", verifyJWT, getCaixaAtual);
-router.post(
-  "/:tenantSlug/pdv/registrar-order",
-  verifyJWT,
-  registrarOrderAndVendaPdv
-);
-router.post("/:tenantSlug/pdv/trocar-operador", verifyJWT, trocarOperador);
-router.post("/:tenantSlug/pdv/cancelar-venda", verifyJWT, cancelarVendaPdv);
-router.post(
-  "/:tenantSlug/pdv/cancelar-ultima-venda",
-  verifyJWT,
-  cancelarUltimaVendaPdv
-);
-router.post(
-  "/:tenantSlug/pdv/reimprimir-ultimo-cupom",
-  verifyJWT,
-  reimprimirUltimoCupom
-);
-router.post(
-  "/:tenantSlug/pdv/reimprimir-cupom",
-  verifyJWT,
-  reimprimirCupomEspecifico
-);
-
 // Rotas Vendas
 router.post("/:tenantSlug/vendas", verifyJWT, createVenda);
 router.put("/:tenantSlug/vendas/:vendaId/status", verifyJWT, alteraStatusVenda);
@@ -312,8 +292,9 @@ router.put("/:tenantSlug/vendas/:orderId/confirmar", verifyJWT, confirmaVenda);
 router.put("/:tenantSlug/vendas/:id/cancelar", verifyJWT, cancelarVenda);
 
 // Rotas Relatórios
-router.get("/:tenantSlug/relatorios/vendas", verifyJWT, getAllVendasByData);
-router.get("/:tenantSlug/relatorios/produtos", verifyJWT, getAllProdutosByData);
+router.get("/:tenantSlug/relatorios", verifyJWT, getRelatorioByData);
+router.get("/:tenantSlug/resumo-relatorio", verifyJWT, getResumoRelatorio);
+router.get("/:tenantSlug/dashboard", verifyJWT, getDashboardData);
 
 // Rotas Formas de Pagamento
 router.get("/:tenantSlug/formas-pagamento", verifyJWT, getAllFormasPagamento);

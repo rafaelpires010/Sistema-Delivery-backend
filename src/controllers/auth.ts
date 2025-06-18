@@ -116,6 +116,9 @@ export const signin: RequestHandler = async (req, res) => {
     token,
     user: {
       nome: user.nome,
+      email: user.email,
+      telefone: user.telefone,
+      id: user.id,
     },
   });
 };
@@ -147,7 +150,7 @@ export const authenticateUser: RequestHandler = async (
 };
 
 export const requestPasswordReset: RequestHandler = async (req, res) => {
-  const { email, tenantSlug } = req.body;
+  const { email, tenantSlug, img, main_color } = req.body;
 
   try {
     // Verifica se o usuário existe
@@ -167,8 +170,8 @@ export const requestPasswordReset: RequestHandler = async (req, res) => {
     await updateUser(user.id, { resetToken, tokenExpiry });
 
     // Envia o email com o link de redefinição de senha
-    const resetLink = `localhost:3001/${tenantSlug}/reset-password?token=${resetToken}`;
-    await sendPasswordResetEmail(email, resetLink, tenantSlug);
+    const resetLink = `${process.env.URL_APP}/${tenantSlug}/reset-password/${resetToken}`;
+    await sendPasswordResetEmail(email, resetLink, tenantSlug, img, main_color);
 
     return res.status(200).json({
       message: "Verifique seu email para redefinir a senha.",

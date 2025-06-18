@@ -22,25 +22,109 @@ export const findUsersWithOrders: RequestHandler = async (
       return res.status(400).json({ error: "TenantSlug é obrigatório." });
     }
 
-    const users = await prisma.user.findMany({
+    // Busca todos os pedidos do tenant, incluindo user e order_user
+    const orders = await prisma.order.findMany({
       where: {
-        orders: {
-          some: {
-            tenant: {
-              slug: tenantSlug, // Filtra pedidos do tenant específico
-            },
-          },
+        tenant: {
+          slug: tenantSlug,
         },
       },
       select: {
-        id: true,
-        nome: true,
-        email: true,
-        telefone: true,
+        preco: true,
+        dataHora_order: true,
+        user: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+            telefone: true,
+          },
+        },
+        order_user: {
+          select: {
+            nome: true,
+            email: true,
+            telefone: true,
+          },
+        },
       },
+      orderBy: { dataHora_order: "desc" },
     });
 
-    return res.json(users);
+    // Monta uma lista única de clientes (por email ou telefone)
+    const clientsMap = new Map();
+    for (const order of orders) {
+      let key,
+        client,
+        isCadastrado = false;
+      if (order.user && order.user.email) {
+        key = order.user.email;
+        isCadastrado = true;
+      } else if (order.user && order.user.telefone) {
+        key = order.user.telefone;
+        isCadastrado = true;
+      } else if (order.order_user && order.order_user.email) {
+        key = order.order_user.email;
+      } else if (order.order_user && order.order_user.telefone) {
+        key = order.order_user.telefone;
+      } else {
+        continue;
+      }
+      client = clientsMap.get(key);
+      if (!client) {
+        if (isCadastrado && order.user) {
+          client = {
+            id: order.user.id,
+            nome: order.user.nome,
+            email: order.user.email,
+            telefone: order.user.telefone,
+            tipo: "cadastrado",
+            totalPedidos: 0,
+            totalGasto: 0,
+            ultimoPedido: null,
+          };
+        } else if (order.order_user) {
+          client = {
+            nome: order.order_user.nome,
+            email: order.order_user.email,
+            telefone: order.order_user.telefone,
+            tipo: "convidado",
+            totalPedidos: 0,
+            totalGasto: 0,
+            ultimoPedido: null,
+          };
+        } else {
+          continue;
+        }
+      } else {
+        // Se já existe e agora é cadastrado, prioriza os dados do cadastro
+        if (isCadastrado && client.tipo === "convidado" && order.user) {
+          client = {
+            id: order.user.id,
+            nome: order.user.nome,
+            email: order.user.email,
+            telefone: order.user.telefone,
+            tipo: "cadastrado",
+            totalPedidos: client.totalPedidos,
+            totalGasto: client.totalGasto,
+            ultimoPedido: client.ultimoPedido,
+          };
+        }
+      }
+      // Atualiza estatísticas
+      client.totalPedidos += 1;
+      client.totalGasto += order.preco || 0;
+      if (
+        !client.ultimoPedido ||
+        (order.dataHora_order && order.dataHora_order > client.ultimoPedido)
+      ) {
+        client.ultimoPedido = order.dataHora_order;
+      }
+      clientsMap.set(key, client);
+    }
+
+    const clients = Array.from(clientsMap.values());
+    return res.json(clients);
   } catch (error) {
     console.error("Erro ao buscar usuários com pedidos:", error);
     return res.status(500).json({ error: "Erro interno do servidor." });

@@ -1,7 +1,6 @@
 import { Router } from "express";
 import * as auth from "../controllers/auth";
 import { verifyJWT } from "../middlewares/jwt";
-import { contato } from "../services/teste";
 
 const router = Router();
 
@@ -16,7 +15,5 @@ router.post("/authorize", verifyJWT, auth.authenticateUser);
 router.post("/auth/request-password-reset", auth.requestPasswordReset);
 
 router.post("/auth/reset-password", auth.resetPassword);
-
-router.post("/auth/testeemail", contato);
 
 export default router;

@@ -25,10 +25,10 @@ export const getTenantBySlug = async (req: ExtendedRequest, res: Response) => {
       where: { slug: tenantSlug },
       include: {
         tenantInfo: true, // Inclui os dados da tabela TenantInfo
-        tipoRece: true, // Inclui os dados da tabela TenantTipoRece
         tenantFuncionamento: true, // Inclui os dados da tabela TenantFuncionamento
         zone: true,
         banners: true,
+        formasPagamento: true,
       },
     });
 
@@ -57,10 +57,10 @@ export const getTenantById = async (req: Request, res: Response) => {
       where: { id: tenantId },
       include: {
         tenantInfo: true, // Inclui os dados da tabela TenantInfo
-        tipoRece: true, // Inclui os dados da tabela TenantTipoRece
         tenantFuncionamento: true, // Inclui os dados da tabela TenantFuncionamento
         zone: true,
         banners: true,
+        formasPagamento: true,
       },
     });
 
@@ -162,6 +162,12 @@ export const getAllTenantByUser = async (req: Request, res: Response) => {
             tenantInfo: {
               select: {
                 cnpj: true,
+                cep: true,
+                rua: true,
+                numero: true,
+                bairro: true,
+                cidade: true,
+                estado: true,
               },
             },
           },
@@ -189,7 +195,7 @@ export const getAllTenantByUser = async (req: Request, res: Response) => {
       status: userTenant.tenant.status,
       OnClose: userTenant.tenant.OnClose,
       img: userTenant.tenant.img,
-      cnpj: userTenant.tenant.tenantInfo?.cnpj,
+      tenantInfo: userTenant.tenant.tenantInfo,
       roles: userTenant.roles.map((r) => r.codigo),
     }));
 
@@ -243,7 +249,6 @@ export const updateTenantLayout = async (req: Request, res: Response) => {
     const data = {
       nome: nome ?? tenant.nome,
       main_color: main_color ?? tenant.main_color,
-      second_color: second_color ?? tenant.second_color,
       img: img ?? tenant.img, // Usa a nova imagem, se fornecida
     };
 
@@ -604,11 +609,18 @@ export const createTenantLayout = async (req: Request, res: Response) => {
           nome,
           slug,
           main_color,
-          second_color,
           img: img ?? "",
           status: true,
           OnClose: false,
-          limite_pdvs: 0,
+        },
+      });
+
+      // Criar categoria Destaques automaticamente
+      await prisma.category.create({
+        data: {
+          nome: "Destaques",
+          id_tenant: newTenant.id,
+          ativo: true,
         },
       });
 

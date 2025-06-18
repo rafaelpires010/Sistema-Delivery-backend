@@ -1,30 +1,30 @@
-import { Request, Response, RequestHandler } from "express";
+import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { addressSchema } from "../schema/Address";
+import { ExtendedRequest } from "../types/extended-request";
+import jwt from "jsonwebtoken";
 
 const prisma = new PrismaClient();
 
-export const getAddressById = async (req: Request, res: Response) => {
+export const getAddressById = async (req: ExtendedRequest, res: Response) => {
   try {
-    // Extrai o ID dos parâmetros da requisição
     const id = Number(req.params.id);
+    const userId = req.user?.id;
 
-    // Verifica se o ID é válido
     if (isNaN(id)) {
       return res.status(400).json({ error: "ID inválido." });
     }
 
-    // Busca o endereço no banco de dados pelo ID
-    const address = await prisma.user_Address.findUnique({
-      where: { id: id },
+    const address = await prisma.user_Address.findFirst({
+      where: { id: id, id_user: userId },
     });
 
-    // Verifica se o endereço foi encontrado
     if (!address) {
-      return res.status(404).json({ error: "Endereço não encontrado." });
+      return res
+        .status(404)
+        .json({ error: "Endereço não encontrado ou não pertence ao usuário." });
     }
 
-    // Retorna o endereço encontrado
     return res.status(200).json(address);
   } catch (error) {
     console.error("Erro ao buscar o endereço:", error);
@@ -34,13 +34,16 @@ export const getAddressById = async (req: Request, res: Response) => {
   }
 };
 
-export const getAddressByUser = async (req: Request, res: Response) => {
-  const { user_id } = req.query; // Obtém o ID do usuário a partir dos parâmetros da query
+export const getAddressByUser = async (req: ExtendedRequest, res: Response) => {
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({ error: "Usuário não autenticado." });
+  }
 
   try {
-    // Busca os endereços associados ao usuário no tenant
     const addresses = await prisma.user_Address.findMany({
-      where: { id_user: Number(user_id) },
+      where: { id_user: userId },
     });
 
     res.json(addresses);
@@ -52,24 +55,18 @@ export const getAddressByUser = async (req: Request, res: Response) => {
   }
 };
 
-export const createAddress = async (req: Request, res: Response) => {
+export const createAddress = async (req: ExtendedRequest, res: Response) => {
   try {
-    // Extraindo os dados do corpo da requisição
-    const {
-      rua,
-      numero,
-      cep,
-      cidade,
-      id_cidade,
-      estado,
-      bairro,
-      complemento,
-      id_user,
-    } = req.body;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Usuário não autenticado." });
+    }
 
-    // Validação dos dados com o zod
+    const { rua, numero, cep, cidade, id_cidade, estado, bairro, complemento } =
+      req.body;
+
     const validation = addressSchema.safeParse({
-      id_user,
+      id_user: userId,
       rua,
       numero,
       cep,
@@ -80,17 +77,15 @@ export const createAddress = async (req: Request, res: Response) => {
       complemento,
     });
 
-    // Verifica se a validação falhou
     if (!validation.success) {
       return res
         .status(400)
         .json({ error: validation.error.flatten().fieldErrors });
     }
 
-    // Criar o novo endereço no banco de dados usando o Prisma
     const newAddress = await prisma.user_Address.create({
       data: {
-        id_user,
+        id_user: userId,
         rua,
         numero,
         cep,
@@ -102,7 +97,6 @@ export const createAddress = async (req: Request, res: Response) => {
       },
     });
 
-    // Retorna o novo endereço criado como resposta
     return res
       .status(201)
       .json({ message: "Endereço criado com sucesso.", newAddress });
@@ -114,22 +108,22 @@ export const createAddress = async (req: Request, res: Response) => {
   }
 };
 
-export const editAddress = async (req: Request, res: Response) => {
+export const editAddress = async (req: ExtendedRequest, res: Response) => {
   try {
-    const { id } = req.params;
-    const {
-      rua,
-      numero,
-      cep,
-      cidade,
-      bairro,
-      id_cidade,
-      estado,
-      complemento,
-      id_user,
-    } = req.body;
+    const addressId = Number(req.params.id);
+    const userId = req.user?.id;
 
-    // Validar os dados com Zod
+    if (isNaN(addressId)) {
+      return res.status(400).json({ error: "ID de endereço inválido." });
+    }
+
+    if (!userId) {
+      return res.status(401).json({ error: "Usuário não autenticado." });
+    }
+
+    const { rua, numero, cep, cidade, bairro, id_cidade, estado, complemento } =
+      req.body;
+
     const validation = addressSchema.safeParse({
       rua,
       numero,
@@ -139,19 +133,27 @@ export const editAddress = async (req: Request, res: Response) => {
       id_cidade,
       estado,
       complemento,
-      id_user,
+      id_user: userId,
     });
 
-    // Verificar se a validação falhou
     if (!validation.success) {
       return res
         .status(400)
         .json({ error: validation.error.flatten().fieldErrors });
     }
 
-    // Atualizar o endereço no banco de dados
+    const address = await prisma.user_Address.findFirst({
+      where: { id: addressId, id_user: userId },
+    });
+
+    if (!address) {
+      return res
+        .status(404)
+        .json({ error: "Endereço não encontrado ou não pertence ao usuário." });
+    }
+
     const updatedAddress = await prisma.user_Address.update({
-      where: { id: Number(id) }, // Certifique-se de converter para número
+      where: { id: addressId },
       data: {
         rua,
         numero,
@@ -161,11 +163,9 @@ export const editAddress = async (req: Request, res: Response) => {
         id_cidade,
         estado,
         complemento,
-        id_user,
       },
     });
 
-    // Retornar o endereço atualizado
     return res
       .status(200)
       .json({ message: "Endereço atualizado com sucesso.", updatedAddress });
@@ -177,22 +177,31 @@ export const editAddress = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteAddress = async (req: Request, res: Response) => {
-  const { id } = req.params;
+export const deleteAddress = async (req: ExtendedRequest, res: Response) => {
+  const addressId = Number(req.params.id);
+  const userId = req.user?.id;
+
+  if (isNaN(addressId)) {
+    return res.status(400).json({ error: "ID de endereço inválido." });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ error: "Usuário não autenticado." });
+  }
 
   try {
-    // Verifica se o endereço existe
-    const address = await prisma.user_Address.findUnique({
-      where: { id: parseInt(id) },
+    const address = await prisma.user_Address.findFirst({
+      where: { id: addressId, id_user: userId },
     });
 
     if (!address) {
-      return res.status(404).json({ error: "Endereço não encontrado." });
+      return res
+        .status(404)
+        .json({ error: "Endereço não encontrado ou não pertence ao usuário." });
     }
 
-    // Deleta o endereço
     await prisma.user_Address.delete({
-      where: { id: parseInt(id) },
+      where: { id: addressId },
     });
 
     return res.status(200).json({ message: "Endereço deletado com sucesso." });

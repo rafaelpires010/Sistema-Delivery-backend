@@ -58,6 +58,9 @@ const ioConfig = {
   },
 };
 
+// Criar uma variável global para o io
+let io: Server;
+
 if (process.env.NODE_ENV === "production") {
   // 🔐 SSL
   const sslOptions = {
@@ -69,11 +72,33 @@ if (process.env.NODE_ENV === "production") {
 
   // Servidor HTTPS
   const httpsServer = https.createServer(sslOptions, app);
-  const io = new Server(httpsServer, ioConfig);
+  io = new Server(httpsServer, ioConfig);
 
   io.on("connection", (socket) => {
     console.log(`Socket conectado: ${socket.id}`);
+
+    socket.on("joinRoom", ({ tenantId }) => {
+      if (tenantId) {
+        socket.join(`tenant-${tenantId}`);
+        console.log(`Cliente ${socket.id} entrou na sala: tenant-${tenantId}`);
+        // Verificar se o socket está na sala
+        const rooms = Array.from(socket.rooms);
+        console.log(`Salas do socket ${socket.id}:`, rooms);
+      }
+    });
+
+    socket.on("disconnect", () => {
+      console.log(`Socket desconectado: ${socket.id}`);
+    });
+
+    // Adicionar listener para debug
+    socket.onAny((eventName, ...args) => {
+      console.log(`Evento recebido: ${eventName}`, args);
+    });
   });
+
+  // Tornar o io disponível globalmente
+  app.set("socketio", io);
 
   httpsServer.listen(443, () => {
     console.log("✅ HTTPS rodando em https://api.bevon.com.br");
@@ -94,11 +119,33 @@ if (process.env.NODE_ENV === "production") {
     : 9000;
 
   const httpServer = http.createServer(app);
-  const io = new Server(httpServer, ioConfig);
+  io = new Server(httpServer, ioConfig);
 
   io.on("connection", (socket) => {
     console.log(`Socket conectado: ${socket.id}`);
+
+    socket.on("joinRoom", ({ tenantId }) => {
+      if (tenantId) {
+        socket.join(`tenant-${tenantId}`);
+        console.log(`Cliente ${socket.id} entrou na sala: tenant-${tenantId}`);
+        // Verificar se o socket está na sala
+        const rooms = Array.from(socket.rooms);
+        console.log(`Salas do socket ${socket.id}:`, rooms);
+      }
+    });
+
+    socket.on("disconnect", () => {
+      console.log(`Socket desconectado: ${socket.id}`);
+    });
+
+    // Adicionar listener para debug
+    socket.onAny((eventName, ...args) => {
+      console.log(`Evento recebido: ${eventName}`, args);
+    });
   });
+
+  // Tornar o io disponível globalmente
+  app.set("socketio", io);
 
   httpServer.listen(serverPort, () => {
     console.log(`🚀 Dev Server rodando em http://localhost:${serverPort}`);

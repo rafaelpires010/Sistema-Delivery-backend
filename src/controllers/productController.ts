@@ -19,6 +19,11 @@ export const getProductsByTenant: RequestHandler = async (
         products: {
           include: {
             category: true, // Inclui a categoria associada ao produto
+            complements: {
+              include: {
+                items: true, // Inclui os ITENS dentro de cada grupo
+              },
+            },
           },
         },
       },
@@ -52,9 +57,19 @@ export const getProductsByTenantActive: RequestHandler = async (
         products: {
           where: {
             ativo: true,
+            isComplement: false, // Apenas produtos principais
           },
           include: {
-            category: true, // Inclui a categoria associada ao produto
+            category: true,
+            complements: {
+              include: {
+                items: {
+                  include: {
+                    product: true, // Inclui o produto vinculado ao complemento
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -100,7 +115,20 @@ export const getProductById: RequestHandler = async (
         },
       },
       include: {
-        category: true, // Inclua a relação 'categoria'
+        category: true,
+        complements: {
+          include: {
+            items: {
+              include: {
+                product: {
+                  include: {
+                    category: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -124,20 +152,44 @@ export const createProduct: RequestHandler = async (
   req: Request,
   res: Response
 ) => {
-  const { nome, id_category, preco, descricao } = req.body;
-  const img = (req.file as any)?.location; // Using the S3 URL provided by multer-s3
-
-  // Tenant slug is passed as a URL parameter
+  const {
+    nome,
+    id_category,
+    preco,
+    descricao,
+    complementsGroupIds,
+    isComplement,
+  } = req.body;
+  const img = (req.file as any)?.location;
   const tenantSlug = req.params.tenantSlug;
 
-  if (!nome || !img || !id_category || !preco || !tenantSlug) {
+  if (!nome || !id_category || !preco) {
     return res
       .status(400)
-      .json({ error: "Todos os campos obrigatórios devem ser preenchidos." });
+      .json({ error: "Nome, categoria e preço são obrigatórios." });
   }
 
   const idCategory = parseInt(id_category as string, 10);
   const price = parseFloat(preco.replace(",", ".") as string);
+  const isComplementProduct = isComplement === "true" || isComplement === true;
+
+  // Se for um produto complemento, não pode ter grupos de complementos
+  if (isComplementProduct && complementsGroupIds) {
+    return res.status(400).json({
+      error: "Produtos complementos não podem ter grupos de complementos.",
+    });
+  }
+
+  // Handle complementsGroupIds: ensure it's an array of numbers
+  let parsedComplementsGroupIds: number[] = [];
+  if (complementsGroupIds && !isComplementProduct) {
+    const ids = Array.isArray(complementsGroupIds)
+      ? complementsGroupIds
+      : [complementsGroupIds];
+    parsedComplementsGroupIds = ids
+      .map((id: string) => parseInt(id, 10))
+      .filter((id: number) => !isNaN(id));
+  }
 
   try {
     // Find the tenant by slug
@@ -153,7 +205,7 @@ export const createProduct: RequestHandler = async (
     const category = await prisma.category.findFirst({
       where: {
         id: idCategory,
-        id_tenant: tenant.id, // Assuming `id_tenant` is the field linking category to tenant
+        id_tenant: tenant.id,
       },
     });
 
@@ -165,11 +217,12 @@ export const createProduct: RequestHandler = async (
 
     const data = {
       nome,
-      img, // S3 URL from multer-s3
+      img: img || null, // Imagem opcional
       id_category: idCategory,
       preco: price,
       descricao: descricao ?? "",
-      id_tenant: tenant.id, // Use the tenant ID from the URL slug
+      id_tenant: tenant.id,
+      isComplement: isComplementProduct,
     };
 
     // Validate data with schema
@@ -183,12 +236,23 @@ export const createProduct: RequestHandler = async (
     // Create the product
     const newProduct = await prisma.product.create({
       data: {
-        nome: body.data.nome,
-        img: body.data.img,
-        id_category: body.data.id_category,
-        preco: body.data.preco,
-        descricao: body.data.descricao,
-        id_tenant: body.data.id_tenant,
+        ...body.data,
+        ...(parsedComplementsGroupIds.length > 0 && {
+          complements: {
+            connect: parsedComplementsGroupIds.map((id: number) => ({ id })),
+          },
+        }),
+      },
+      include: {
+        complements: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -199,9 +263,6 @@ export const createProduct: RequestHandler = async (
   } finally {
     await prisma.$disconnect();
   }
-
-  console.log("Dados recebidos:", req.body);
-  console.log("Arquivo recebido:", req.file);
 };
 
 //deletar produto
@@ -259,12 +320,21 @@ export const updateProduct: RequestHandler = async (
   req: Request,
   res: Response
 ) => {
-  const { nome, id_category, preco, descricao } = req.body;
-  const img = (req.file as any)?.location; // Caminho da imagem no S3
+  const {
+    nome,
+    id_category,
+    preco,
+    descricao,
+    complementsGroupIds,
+    isComplement,
+  } = req.body;
+
+  console.log("Dados recebidos:", req.body);
+  const img = (req.file as any)?.location;
   const productId = parseInt(req.params.productId, 10);
   const tenantSlug = req.params.tenantSlug;
+  const isComplementProduct = isComplement === "true" || isComplement === true;
 
-  // Verificar se o ID do produto é válido
   if (isNaN(productId)) {
     return res.status(400).json({ error: "ID do produto inválido." });
   }
@@ -293,19 +363,46 @@ export const updateProduct: RequestHandler = async (
         .json({ error: "Produto não encontrado ou não pertence ao tenant." });
     }
 
+    // Se for um produto complemento, não pode ter grupos de complementos
+    if (isComplementProduct && complementsGroupIds) {
+      return res.status(400).json({
+        error: "Produtos complementos não podem ter grupos de complementos.",
+      });
+    }
+
     // Prepara os dados para atualização
-    const data: any = {
-      nome: nome ?? product.nome,
-      img: img ? img : product.img, // Usa a imagem fornecida ou mantém a atual
-      id_category: id_category
-        ? parseInt(id_category as string, 10)
-        : product.id_category,
-      preco: preco ? parseFloat(preco.replace(",", ".")) : product.preco, // Garantir que preço seja convertido corretamente
-      descricao: descricao ?? product.descricao,
-    };
+    const dataToUpdate: any = {};
+    if (nome) dataToUpdate.nome = nome;
+    if (img) dataToUpdate.img = img;
+    if (id_category)
+      dataToUpdate.id_category = parseInt(id_category as string, 10);
+    if (preco) dataToUpdate.preco = parseFloat(preco.replace(",", "."));
+    if (descricao) dataToUpdate.descricao = descricao;
+    if (isComplement !== undefined)
+      dataToUpdate.isComplement = isComplementProduct;
+
+    // Lógica para atualizar os grupos de complementos
+    if (complementsGroupIds !== undefined && !isComplementProduct) {
+      // Converter para array se for string única
+      const ids = Array.isArray(complementsGroupIds)
+        ? complementsGroupIds
+        : [complementsGroupIds];
+
+      // Converter para números e filtrar inválidos
+      const parsedIds = ids
+        .map((id: string) => parseInt(id, 10))
+        .filter((id: number) => !isNaN(id));
+
+      console.log("IDs dos grupos de complementos:", parsedIds);
+
+      // Atualizar os grupos de complementos
+      dataToUpdate.complements = {
+        set: parsedIds.map((id: number) => ({ id })),
+      };
+    }
 
     // Validar os dados com o schema
-    const body = updateProductSchema.safeParse(data);
+    const body = updateProductSchema.safeParse(dataToUpdate);
     if (!body.success) {
       return res
         .status(400)
@@ -315,7 +412,21 @@ export const updateProduct: RequestHandler = async (
     // Atualizar o produto no banco de dados
     const updatedProduct = await prisma.product.update({
       where: { id: productId },
-      data: body.data, // Dados validados
+      data: {
+        ...body.data,
+        complements: dataToUpdate.complements, // Incluir a atualização dos complementos
+      },
+      include: {
+        complements: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     res.status(200).json(updatedProduct);
