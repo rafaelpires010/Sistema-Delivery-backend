@@ -589,7 +589,7 @@ export const createTenantLayout = async (req: Request, res: Response) => {
       });
     }
 
-    const { nome, slug, main_color, second_color } = validationResult.data;
+    const { nome, slug, main_color } = validationResult.data;
 
     // 2. Verificar se o tenant já existe (antes da transação)
     const existingTenant = await prisma.tenant.findFirst({
